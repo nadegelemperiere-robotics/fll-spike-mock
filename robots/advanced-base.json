@@ -1,0 +1,6 @@
+{
+  "name": "Advanced Driving Base",
+  "model": "advanced-base.ldr",
+  "front": "-z",
+  "notes": "front : direction de l'avant du robot dans le repère du fichier LDraw. Valeurs admises : '+x', '-x', '+z', '-z'. Le simulateur fait tourner le modèle pour aligner cette direction avec -Z (convention : heading=0 = robot face au nord du mat)."
+}

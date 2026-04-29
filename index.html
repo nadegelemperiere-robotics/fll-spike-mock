@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SPIKE Prime Simulator</title>
+  <link rel="stylesheet" href="src/editor/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">▣</span>
+      <span class="title">SPIKE Prime Simulator</span>
+    </div>
+    <div class="actions">
+      <label class="select-group">
+        <span class="select-label">Robot</span>
+        <select id="robot-select" class="btn"></select>
+      </label>
+      <label class="select-group">
+        <span class="select-label">Mat</span>
+        <select id="mat-select" class="btn"></select>
+      </label>
+      <button class="btn primary" id="run-btn">▶ Exécuter</button>
+      <button class="btn" id="stop-btn">■ Stop</button>
+      <button class="btn" id="reset-btn">⟲ Reset</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel editor-panel">
+      <div class="tabs">
+        <button class="tab active" data-tab="blocks">🧩 Blocs</button>
+        <button class="tab" data-tab="python">🐍 Python</button>
+      </div>
+      <div class="tab-content" id="tab-blocks">
+        <div id="blockly-area"></div>
+      </div>
+      <div class="tab-content hidden" id="tab-python">
+        <div id="monaco-area"></div>
+      </div>
+    </section>
+
+    <section class="panel simulator-panel">
+      <div class="sim-header">
+        <span id="robot-name">Aucun robot</span>
+        <span class="sep">·</span>
+        <span id="mat-name">Aucun mat</span>
+        <span class="sep">·</span>
+        <span id="sim-status">Prêt</span>
+      </div>
+      <canvas id="sim-canvas"></canvas>
+      <div class="sim-overlay">
+        <div class="sensor-readout" id="sensor-readout"></div>
+      </div>
+    </section>
+
+    <section class="panel console-panel">
+      <div class="console-header">
+        <span>Console</span>
+        <button class="btn small" id="clear-console">Effacer</button>
+      </div>
+      <div id="console-output"></div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/blockly@10.4.3/blockly.min.js"></script>
+  <script src="https://unpkg.com/blockly@10.4.3/python_compressed.js"></script>
+  <script src="https://unpkg.com/blockly@10.4.3/msg/fr.js"></script>
+  <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+      "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+    }
+  }
+  </script>
+
+  <script type="module" src="src/editor/ui.js"></script>
+</body>
+</html>
