@@ -1,0 +1,12 @@
+{
+  "name": "Country and City",
+  "image": "country-and-city.png",
+  "width_mm": 2355.85,
+  "height_mm": 1136.65,
+  "start_zone": {
+    "x_mm": 200,
+    "y_mm": 200,
+    "rotation_deg": 0
+  },
+  "notes": "Dimensions standards FLL : 2362 x 1143 mm. Remplacez demo-mat.png par votre propre image de mat (résolution conseillée : 1pixel = 1mm)."
+}

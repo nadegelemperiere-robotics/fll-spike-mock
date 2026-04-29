@@ -1,0 +1,28 @@
+0 SPIKE Prime Advanced Driving Base (test simulator)
+0 Name: advanced-base.ldr
+0 Author: spike-mock
+0 !LICENSE Redistributable under CCAL version 2.0
+
+0 // Coordonnees LDraw : 1 LDU = 0.4 mm. Y vers le bas.
+0 // Empattement vise ~120 mm => moteurs a +/- 150 LDU.
+
+0 // ----- Hub SPIKE Prime, centre a l origine -----
+1 71 0 0 0 1 0 0 0 1 0 0 0 1 27843.dat
+
+0 // ----- Moteur gauche (Large Angular Motor) -----
+1 71 -150 0 0 1 0 0 0 1 0 0 0 1 54696c01.dat
+
+0 // ----- Moteur droit (Large Angular Motor) -----
+1 71 150 0 0 -1 0 0 0 1 0 0 0 -1 54696c01.dat
+
+0 // ----- Roue gauche (grosse roue bleue 56mm) -----
+1 1 -200 0 0 0 0 -1 0 1 0 1 0 0 39367.dat
+
+0 // ----- Roue droite -----
+1 1 200 0 0 0 0 1 0 1 0 -1 0 0 39367.dat
+
+0 // ----- Capteur couleur avant gauche (vise vers le bas, en avant) -----
+1 71 -60 -16 -120 1 0 0 0 1 0 0 0 1 37308c01.dat
+
+0 // ----- Capteur couleur avant droit -----
+1 71 60 -16 -120 1 0 0 0 1 0 0 0 1 37308c01.dat

@@ -1,0 +1,12 @@
+{
+  "name": "Mat de démo (vierge FLL)",
+  "image": "demo-mat.png",
+  "width_mm": 2362,
+  "height_mm": 1143,
+  "start_zone": {
+    "x_mm": 200,
+    "y_mm": 200,
+    "rotation_deg": 0
+  },
+  "notes": "Dimensions standards FLL : 2362 x 1143 mm. Remplacez demo-mat.png par votre propre image de mat (résolution conseillée : 1pixel = 1mm)."
+}
