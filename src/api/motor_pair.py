@@ -45,7 +45,9 @@ def move(pair_id, steering, *, velocity=360, acceleration=1000):
     lp, rp = _get(pair_id)
     lv, rv = _steering_to_velocities(velocity, steering)
     _motor.run(lp, lv)
-    _motor.run(rp, rv)
+    # Moteur droit monté en miroir : on envoie l'opposé pour que les deux
+    # roues tournent dans le même sens physique.
+    _motor.run(rp, -rv)
 
 
 async def move_for_time(pair_id, duration, steering=0, *, velocity=360, stop=_motor.BRAKE, acceleration=1000, deceleration=1000):
@@ -71,7 +73,8 @@ async def move_for_degrees(pair_id, degrees, steering=0, *, velocity=360, stop=_
 def move_tank(pair_id, left_velocity, right_velocity):
     lp, rp = _get(pair_id)
     _motor.run(lp, left_velocity)
-    _motor.run(rp, right_velocity)
+    # Moteur droit monté en miroir : voir move().
+    _motor.run(rp, -right_velocity)
 
 
 async def move_tank_for_time(pair_id, duration, left_velocity, right_velocity, *, stop=_motor.BRAKE, acceleration=1000, deceleration=1000):
