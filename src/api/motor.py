@@ -21,9 +21,30 @@ COUNTERCLOCKWISE = 3
 
 _MAX_DPS = 600
 
+# Vitesse par défaut stockée par moteur (en % comme dans l'app SPIKE).
+# Utilisée par les blocs SPIKE qui ne prennent pas de vitesse explicite.
+_default_pct = {}
+
 
 def _vel_to_pct(velocity):
     return max(-100, min(100, int(round(velocity * 100 / _MAX_DPS))))
+
+
+def set_speed(p, pct):
+    """Stocke la vitesse par défaut (%) pour le moteur p (utilisée par les blocs SPIKE sans vitesse explicite)."""
+    letter = _to_letter(p)
+    _default_pct[letter] = max(-100, min(100, int(pct)))
+
+
+def get_speed(p):
+    """Retourne la vitesse par défaut stockée pour le moteur p (%)."""
+    letter = _to_letter(p)
+    return _default_pct.get(letter, 50)
+
+
+def get_speed_dps(p):
+    """Vitesse par défaut en deg/s (positive)."""
+    return abs(int((get_speed(p) / 100) * _MAX_DPS))
 
 
 def run(p, velocity, *, acceleration=1000):

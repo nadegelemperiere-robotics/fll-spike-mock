@@ -356,6 +356,8 @@ function defineBlocks() {
       ],
       output: 'Number', colour: C.motor,
     },
+
+    // === Motor (SPIKE app style) ===
     {
       type: 'spike_motor_position',
       message0: '%1 %2 position',
@@ -402,6 +404,7 @@ function defineBlocks() {
       type: 'sensor_is_color',
       message0: 'is color on port %1 %2 ?',
       args0: [
+        MOTOR_ICON,
         { type: 'field_dropdown', name: 'PORT', options: PORT_OPTIONS },
         { type: 'field_dropdown', name: 'COLOR', options: COLOR_OPTIONS },
       ],
@@ -499,6 +502,18 @@ function defineBlocks() {
 
   P.movement_set_motors = b =>
     `motor_pair.pair(motor_pair.PAIR_1, port.${b.getFieldValue('L')}, port.${b.getFieldValue('R')})\n`;
+  P.movement_move_for_time = b =>
+    `await motor_pair.move_for_time(motor_pair.PAIR_1, int((${val(b,'T')})*1000), ${val(b,'STEER')}, velocity=${val(b,'V')})\n`;
+  P.movement_move_for_degrees = b =>
+    `await motor_pair.move_for_degrees(motor_pair.PAIR_1, ${val(b,'D')}, ${val(b,'STEER')}, velocity=${val(b,'V')})\n`;
+  P.movement_start = b =>
+    `motor_pair.move(motor_pair.PAIR_1, ${val(b,'STEER')}, velocity=${val(b,'V')})\n`;
+  P.movement_stop = b =>
+    `motor_pair.stop(motor_pair.PAIR_1)\n`;
+  P.movement_tank_for_time = b =>
+    `await motor_pair.move_tank_for_time(motor_pair.PAIR_1, int((${val(b,'T')})*1000), ${val(b,'L')}, ${val(b,'R')})\n`;
+  P.movement_tank_for_degrees = b =>
+    `await motor_pair.move_tank_for_degrees(motor_pair.PAIR_1, ${val(b,'D')}, ${val(b,'L')}, ${val(b,'R')})\n`;
 
   P.movement_set_speed = b =>
     `_mvmt_speed = ${val(b,'PCT','50')}\n`;
