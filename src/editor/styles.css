@@ -90,12 +90,26 @@ select.btn option {
 
 .layout {
   display: grid;
-  grid-template-columns: 420px 1fr 360px;
-  grid-template-rows: 1fr;
+  grid-template-columns: var(--editor-width, 60%) 5px 1fr;
+  grid-template-rows: 2fr 1fr;
   height: calc(100vh - 52px);
-  gap: 1px;
+  row-gap: 1px;
+  column-gap: 0;
   background: var(--border);
 }
+
+.editor-panel    { grid-column: 1; grid-row: 1 / span 2; }
+.splitter        { grid-column: 2; grid-row: 1 / span 2; }
+.simulator-panel { grid-column: 3; grid-row: 1; }
+.console-panel   { grid-column: 3; grid-row: 2; }
+
+.splitter {
+  background: var(--border);
+  cursor: col-resize;
+  user-select: none;
+  transition: background 0.15s;
+}
+.splitter:hover, .splitter.dragging { background: var(--accent); }
 
 .panel {
   background: var(--panel);

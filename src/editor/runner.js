@@ -22,6 +22,7 @@ export async function runPython(pyodide, code, scene, log) {
     setMotor: (port, velocity) => scene.controller.setMotorVelocity(port, velocity),
     stopMotor: (port) => scene.controller.stopMotor(port),
     getMotorPosition: (port) => scene.controller.getMotorPosition(port),
+    getMotorVelocity: (port) => scene.controller.getMotorVelocity(port),
     getHeading: () => scene.controller.getHeading(),
     getColor: (port) => scene.controller.readColorSensor(port),
     getReflectedLight: (port) => scene.controller.readReflectedLight(port),
@@ -37,7 +38,22 @@ export async function runPython(pyodide, code, scene, log) {
   pyodide.setStderr({ batched: (s) => log(s, 'err') });
 
   let stopped = false;
+  let errored = false;
   try {
+    // Reset des états Python qui persistent entre runs (modules cachés par Pyodide).
+    await pyodide.runPythonAsync(`
+import sys
+_m = sys.modules.get('motor')
+if _m is not None:
+    _m._default_pct.clear()
+_mp = sys.modules.get('motor_pair')
+if _mp is not None:
+    _mp._pairs.clear()
+_h = sys.modules.get('hub')
+if _h is not None and hasattr(_h, 'motion_sensor'):
+    _h.motion_sensor._yaw_offset_rad = 0.0
+`);
+
     await pyodide.runPythonAsync(code);
     await pyodide.runPythonAsync(`
 import runloop as _rl
@@ -52,13 +68,17 @@ if _rl._main_coro is not None:
       stopped = true;
       log('Exécution arrêtée.', 'info');
     } else {
+      errored = true;
       log(msg, 'err');
       throw e;
     }
   } finally {
-    // Toujours forcer l'arrêt des moteurs en fin de run, quoi qu'il arrive.
-    for (const port of ['A', 'B', 'C', 'D', 'E', 'F']) {
-      scene.controller.stopMotor(port);
+    // On stoppe les moteurs uniquement sur Stop explicite ou erreur.
+    // Si main() se termine normalement, on laisse motor.run() continuer.
+    if (stopped || errored) {
+      for (const port of ['A', 'B', 'C', 'D', 'E', 'F']) {
+        scene.controller.stopMotor(port);
+      }
     }
   }
   return { stopped };

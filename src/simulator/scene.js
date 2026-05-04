@@ -59,19 +59,34 @@ export async function initScene(canvas) {
     dragging: false,
   };
 
-  // Resize responsive
+  // Resize responsive : on cadre toujours la totalité du mat (avec une marge),
+  // peu importe l'aspect ratio de la zone simulateur.
   function resize() {
     const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (w === 0 || h === 0) return;
     renderer.setSize(w, h, false);
-    // On ajuste l'orthographique pour conserver le ratio mat
     const aspect = w / h;
-    const halfH = 700;
-    camera.left = -halfH * aspect;
-    camera.right = halfH * aspect;
+    const margin = 100;
+    const matW = state.matWidthMm + margin;
+    const matH = state.matHeightMm + margin;
+    const matAspect = matW / matH;
+    let halfW, halfH;
+    if (aspect > matAspect) {
+      // Canvas plus large que le mat : on cale sur la hauteur, on rajoute des marges horizontales
+      halfH = matH / 2;
+      halfW = halfH * aspect;
+    } else {
+      // Canvas plus étroit : on cale sur la largeur, on rajoute des marges verticales
+      halfW = matW / 2;
+      halfH = halfW / aspect;
+    }
+    camera.left = -halfW;
+    camera.right = halfW;
     camera.top = halfH;
     camera.bottom = -halfH;
     camera.updateProjectionMatrix();
   }
+  state._resize = resize;
   resize();
   new ResizeObserver(resize).observe(canvas);
 
@@ -86,6 +101,7 @@ export async function initScene(canvas) {
     if (state.robot && state.robotModel && !state.dragging) {
       stepKinematics(state, dt);
     }
+    updateSensorMarkers(state);
     renderer.render(scene, camera);
 
     // Readout des capteurs (10 Hz, pas besoin de plus)
@@ -105,6 +121,31 @@ export async function initScene(canvas) {
   state.controller = makeController(state);
 
   return state;
+}
+
+
+// --- Marqueurs debug : un disque à l'endroit exact où chaque capteur lit ---
+
+function updateSensorMarkers(state) {
+  if (!state.sensors || !state.robotModel || !state.controller) return;
+  if (!state.sensorMarkers) state.sensorMarkers = new Map();
+
+  for (const s of state.robotModel.sensors) {
+    if (s.type !== 'color_sensor') continue;
+    const wp = state.sensors._readPos ? state.sensors._readPos(s.port) : null;
+    if (!wp) continue;
+    let mk = state.sensorMarkers.get(s.port);
+    if (!mk) {
+      const geo = new THREE.RingGeometry(8, 12, 24);
+      const mat = new THREE.MeshBasicMaterial({ color: 0xff00ff, side: THREE.DoubleSide, depthTest: false });
+      mk = new THREE.Mesh(geo, mat);
+      mk.rotation.x = -Math.PI / 2;
+      mk.renderOrder = 999;
+      state.scene.add(mk);
+      state.sensorMarkers.set(s.port, mk);
+    }
+    mk.position.set(wp.x, 1, wp.z);
+  }
 }
 
 
@@ -305,6 +346,7 @@ function makeController(state) {
     setMotorVelocity(port, v) { state.robotState.motorVel[port] = Math.max(-100, Math.min(100, v)); },
     stopMotor(port) { state.robotState.motorVel[port] = 0; },
     getMotorPosition(port) { return state.robotState.motorPos[port] || 0; },
+    getMotorVelocity(port) { return state.robotState.motorVel[port] || 0; },
     getHeading() { return state.robotState.heading; },
     readColorSensor(port) {
       if (!state.sensors) return null;
@@ -373,13 +415,8 @@ export async function loadMat(state, config, jsonFile) {
     state.sensors = createSensorReader(state);
   }
 
-  // Replacer la caméra pour cadrer le mat
-  const halfMax = Math.max(config.width_mm, config.height_mm) / 2 + 100;
-  state.camera.left = -halfMax;
-  state.camera.right = halfMax;
-  state.camera.top = halfMax;
-  state.camera.bottom = -halfMax;
-  state.camera.updateProjectionMatrix();
+  // Recadrer la caméra sur le nouveau mat
+  state._resize?.();
 
   // Position de départ (zone start) si fournie.
   // rotation_deg : convention boussole, 0° = nord (-Z), positif = horaire (CW).
@@ -404,10 +441,30 @@ export async function loadRobot(state, ldrText, config = {}) {
     state.robotModel = null;
   }
 
-  const { group, components } = await loadLdrawModel(ldrText);
+  // La rotation `front` est appliquée DÈS le parse LDraw : tout est en repère
+  // canonique (front = -Z, latéral = X) à partir d'ici.
+  const { group, components } = await loadLdrawModel(ldrText, config);
   const model = buildRobotModel(components);
-  model.frontRotation = frontAxisToRotation(config.front);
+  model.frontRotation = 0;
   model.config = config;
+
+  // Recentrer sur le milieu des deux roues motrices : c'est le repère naturel
+  // de la cinématique différentielle (un moteur arrêté => pivot autour de cette roue).
+  if (model.leftMotor && model.rightMotor) {
+    const lp = model.leftMotor.position;
+    const rp = model.rightMotor.position;
+    const midX = (lp[0] + rp[0]) / 2;
+    const midZ = (lp[2] + rp[2]) / 2;
+    if (midX !== 0 || midZ !== 0) {
+      for (const c of components) {
+        c.position = [c.position[0] - midX, c.position[1], c.position[2] - midZ];
+      }
+      for (const child of group.children) {
+        child.position.x -= midX;
+        child.position.z -= midZ;
+      }
+    }
+  }
 
   state.scene.add(group);
   state.robot = group;

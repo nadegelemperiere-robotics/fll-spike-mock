@@ -30,6 +30,11 @@ function nearestColor(r, g, b) {
 
 export function createSensorReader(state) {
   return {
+    _readPos(port) {
+      const sensor = state.robotModel?.sensors.find(s => s.port === port && s.type === 'color_sensor');
+      if (!sensor) return null;
+      return sensorWorldPos(state, sensor);
+    },
     readColor(port) {
       if (!state.matCtx || !state.robotModel) return null;
       const sensor = state.robotModel.sensors.find(s => s.port === port && s.type === 'color_sensor');
@@ -66,13 +71,14 @@ export function createSensorReader(state) {
 }
 
 function sensorWorldPos(state, sensor) {
-  // Position du capteur en coord-monde, en tenant compte
-  // du déplacement du robot (les positions stockées sont relatives au modèle initial).
+  // sensor.position est relatif au hub (recentrage à la lecture du LDR).
+  // L'angle visuel du robot = heading + frontRotation (alignement modèle).
   const local = new THREE.Vector3(...sensor.position);
-  // Rotation du robot autour de Y
-  const cosA = Math.cos(-state.robotState.heading);
-  const sinA = Math.sin(-state.robotState.heading);
-  const rx = local.x * cosA - local.z * sinA;
-  const rz = local.x * sinA + local.z * cosA;
+  const totalAngle = state.robotState.heading + (state.robotModel?.frontRotation || 0);
+  const cos = Math.cos(totalAngle);
+  const sin = Math.sin(totalAngle);
+  // Rotation autour de Y comme dans Three.js (rotation.y = totalAngle)
+  const rx = cos * local.x + sin * local.z;
+  const rz = -sin * local.x + cos * local.z;
   return { x: state.robotState.x + rx, z: state.robotState.z + rz };
 }

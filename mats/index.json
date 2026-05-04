@@ -1,4 +1,4 @@
 [
-  { "file": "demo-mat.json", "name": "Mat de démo (vierge FLL)" },
-  { "file": "country-and-city.json", "name": "Country and City" }
+   { "file": "country-and-city.json", "name": "Country and City" },
+   { "file": "demo-mat.json", "name": "Mat de démo (vierge FLL)" }
 ]
