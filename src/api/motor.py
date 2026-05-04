@@ -5,46 +5,33 @@ Le simulateur considère qu'un moteur tourne au plus à 600 deg/s à fond.
 """
 from _sim import _b, _to_letter
 
-# Stop modes
-COAST = 0
-BRAKE = 1
-HOLD = 2
-CONTINUE = 3
+# Statuts moteur
+READY        = 0
+RUNNING      = 1
+STALLED      = 2
+CANCELLED    = 3
+ERROR        = 4
+DISCONNECTED = 5
+
+# Modes de stop
+COAST       = 0
+BRAKE       = 1
+HOLD        = 2
+CONTINUE    = 3
 SMART_COAST = 4
 SMART_BRAKE = 5
 
-# Directions
-SHORTEST_PATH = 0
-LONGEST_PATH = 1
-CLOCKWISE = 2
-COUNTERCLOCKWISE = 3
+# Directions (pour run_to_absolute_position)
+CLOCKWISE        = 0
+COUNTERCLOCKWISE = 1
+SHORTEST_PATH    = 2
+LONGEST_PATH     = 3
 
 _MAX_DPS = 1100  # Vitesse max (deg/s) à 100%, conforme SPIKE App 3
-
-# Vitesse par défaut stockée par moteur (en % comme dans l'app SPIKE).
-# Utilisée par les blocs SPIKE qui ne prennent pas de vitesse explicite.
-_default_pct = {}
 
 
 def _vel_to_pct(velocity):
     return max(-100, min(100, int(round(velocity * 100 / _MAX_DPS))))
-
-
-def set_speed(p, pct):
-    """Stocke la vitesse par défaut (%) pour le moteur p (utilisée par les blocs SPIKE sans vitesse explicite)."""
-    letter = _to_letter(p)
-    _default_pct[letter] = max(-100, min(100, int(pct)))
-
-
-def get_speed(p):
-    """Retourne la vitesse par défaut stockée pour le moteur p (%)."""
-    letter = _to_letter(p)
-    return _default_pct.get(letter, 50)
-
-
-def get_speed_dps(p):
-    """Vitesse par défaut en deg/s (positive)."""
-    return abs(int((get_speed(p) / 100) * _MAX_DPS))
 
 
 def run(p, velocity, *, acceleration=1000):

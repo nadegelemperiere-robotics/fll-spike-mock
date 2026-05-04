@@ -217,7 +217,6 @@ const TOOLBOX = {
         tb('light_set_pixel',         { PCT: 100 }),
         tb('light_set_orientation'),
         tb('light_power_button'),
-        tb('light_color_sensor',      { PCT: 100 }),
       ]
     },
     {
@@ -287,7 +286,7 @@ function wrapEventCoro(P, block, funcName, body) {
   const indent = (s, n) => s.split('\n').map(l => l ? ' '.repeat(n) + l : l).join('\n');
   const trimmed = body.replace(/\s+$/, '');
   const safeBody = trimmed || 'pass';
-  const globalsLine = '    global _mvmt_speed, _mvmt_dpr_mm';
+  const globalsLine = '    global _mvmt_speed, _mvmt_dpr_mm, _motor_speed';
 
   switch (block.type) {
     case 'event_when_started':
@@ -757,17 +756,6 @@ function defineBlocks() {
       ],
       previousStatement: null, nextStatement: null, colour: C.light,
     },
-    {
-      type: 'light_color_sensor',
-      message0: '%1 %2 light up %3 %%',
-      args0: [
-        COLOR_LIGHT_ICON,
-        { type: 'field_dropdown', name: 'PORT', options: PORT_OPTIONS },
-        { type: 'input_value', name: 'PCT', check: 'Number' },
-      ],
-      previousStatement: null, nextStatement: null, colour: C.light,
-      inputsInline: true,
-    },
 
     // === Sound ===
     {
@@ -1000,10 +988,11 @@ function defineBlocks() {
   P.movement_stop = b =>
     `motor_pair.stop(motor_pair.PAIR_1)\n`;
 
-  // Motor (style SPIKE) — appelle l'API motor avec la vitesse stockée par moteur
-  // (motor.set_speed / motor.get_speed_dps).
+  // Motor (style SPIKE) — la vitesse par défaut par moteur est stockée dans
+  // le dict module-level `_motor_speed` (% 0..100). On la convertit en deg/s
+  // au moment de l'appel.
   function motorVelExpr(port) {
-    return `motor.get_speed_dps(port.${port})`;
+    return `abs(int(_motor_speed['${port}'] / 100 * 1100))`;
   }
 
   P.spike_motor_run_for = b => {
@@ -1042,10 +1031,10 @@ function defineBlocks() {
     `motor.stop(port.${b.getFieldValue('PORT')})\n`;
 
   P.spike_motor_set_speed = b =>
-    `motor.set_speed(port.${b.getFieldValue('PORT')}, ${val(b,'PCT','50')})\n`;
+    `_motor_speed['${b.getFieldValue('PORT')}'] = ${val(b,'PCT','50')}\n`;
 
   P.spike_motor_get_speed = b =>
-    [`motor.get_speed(port.${b.getFieldValue('PORT')})`, P.ORDER_FUNCTION_CALL];
+    [`_motor_speed['${b.getFieldValue('PORT')}']`, P.ORDER_ATOMIC];
 
   P.spike_motor_position = b =>
     [`motor.absolute_position(port.${b.getFieldValue('PORT')})`, P.ORDER_FUNCTION_CALL];
@@ -1090,11 +1079,6 @@ function defineBlocks() {
     return `light.color(light.${lightId}, color.${colorId})\n`;
   };
 
-  P.light_color_sensor = b => {
-    const port = b.getFieldValue('PORT');
-    const pct = val(b, 'PCT', '100');
-    return `color_sensor.light_up_all(port.${port}, ${pct})\n`;
-  };
 
   // Son
   P.sound_beep = b =>
@@ -1220,6 +1204,7 @@ export function setupBlockly(container) {
     this.definitions_['_state_vars'] =
       "_mvmt_speed = 50\n" +
       "_mvmt_dpr_mm = 175.929\n" +
+      "_motor_speed = {'A': 50, 'B': 50, 'C': 50, 'D': 50, 'E': 50, 'F': 50}\n" +
       "import time as _time\n" +
       "_program_start_t = _time.monotonic()";
 

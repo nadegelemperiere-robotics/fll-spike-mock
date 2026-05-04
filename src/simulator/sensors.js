@@ -3,19 +3,17 @@
 
 import * as THREE from 'three';
 
-// Bins de couleurs reconnues par le capteur SPIKE (palette SPIKE 3 complète).
+// Couleurs reconnues par le capteur SPIKE Prime (les 9 officielles).
 const COLOR_BINS = [
-  { name: 'black',     rgb: [30,  30,  30] },
-  { name: 'magenta',   rgb: [200, 30,  130] },
-  { name: 'purple',    rgb: [130, 50,  180] },
-  { name: 'blue',      rgb: [40,  100, 200] },
-  { name: 'azure',     rgb: [60,  170, 230] },
-  { name: 'turquoise', rgb: [60,  200, 180] },
-  { name: 'green',     rgb: [50,  170, 80] },
-  { name: 'yellow',    rgb: [240, 220, 60] },
-  { name: 'orange',    rgb: [240, 140, 50] },
-  { name: 'red',       rgb: [200, 50,  50] },
-  { name: 'white',     rgb: [240, 240, 240] },
+  { name: 'black',   rgb: [30,  30,  30] },
+  { name: 'magenta', rgb: [200, 30,  130] },
+  { name: 'blue',    rgb: [40,  100, 200] },
+  { name: 'azure',   rgb: [60,  170, 230] },
+  { name: 'green',   rgb: [50,  170, 80] },
+  { name: 'yellow',  rgb: [240, 220, 60] },
+  { name: 'orange',  rgb: [240, 140, 50] },
+  { name: 'red',     rgb: [200, 50,  50] },
+  { name: 'white',   rgb: [240, 240, 240] },
 ];
 
 function nearestColor(r, g, b) {
@@ -59,6 +57,21 @@ export function createSensorReader(state) {
       // Luminance perçue
       const lum = 0.2126*data[0] + 0.7152*data[1] + 0.0722*data[2];
       return Math.round(lum / 255 * 100);
+    },
+
+    readRGBI(port) {
+      if (!state.matCtx || !state.robotModel) return [0, 0, 0, 0];
+      const sensor = state.robotModel.sensors.find(s => s.port === port && s.type === 'color_sensor');
+      if (!sensor) return [0, 0, 0, 0];
+      const { x, z } = sensorWorldPos(state, sensor);
+      const px = Math.floor((x + state.matWidthMm / 2) / state.matWidthMm * state.matCanvas.width);
+      const py = Math.floor((z + state.matHeightMm / 2) / state.matHeightMm * state.matCanvas.height);
+      if (px < 0 || py < 0 || px >= state.matCanvas.width || py >= state.matCanvas.height) return [0, 0, 0, 0];
+      const data = state.matCtx.getImageData(px, py, 1, 1).data;
+      // Échelle SPIKE : 0..1024 par composante
+      const scale = (v) => Math.round(v * 1024 / 255);
+      const lum = 0.2126*data[0] + 0.7152*data[1] + 0.0722*data[2];
+      return [scale(data[0]), scale(data[1]), scale(data[2]), scale(lum)];
     },
 
     readDistance(port) {

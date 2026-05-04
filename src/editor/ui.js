@@ -2,7 +2,7 @@
 import { initScene, loadMat, loadRobot, resetSimulation } from '../simulator/scene.js';
 import { setupBlockly } from './blockly-config.js';
 import { setupMonaco } from './monaco-config.js';
-import { runPython, stopPython } from './runner.js';
+import { initRunner, runPython, stopPython } from './runner.js';
 import { parseIoFile } from '../robot/io-parser.js';
 import { HubDisplay } from '../simulator/hub-display.js';
 
@@ -306,46 +306,24 @@ async function initSelectorsAndRestore() {
 }
 await initSelectorsAndRestore();
 
-// Initialiser Pyodide en arrière-plan (n'empêche pas le chargement mat/robot)
-log('Chargement de Pyodide (Python dans le navigateur)...', 'info');
-let pyodide = null;
-const SPIKE3_MODULES = [
-  '_sim', 'hub', 'motor', 'motor_pair', 'color', 'orientation',
-  'color_sensor', 'distance_sensor', 'force_sensor', 'runloop',
-];
-const pyodideReady = (async () => {
-  try {
-    pyodide = await loadPyodide({
-      indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/'
-    });
-    window.pyodide = pyodide;
-    log('Pyodide prêt.', 'ok');
-    pyodide.FS.mkdirTree('/lib');
-    const cacheBust = Date.now();
-    for (const m of SPIKE3_MODULES) {
-      const src = await fetch(`src/api/${m}.py?v=${cacheBust}`, { cache: 'no-store' }).then(r => r.text());
-      pyodide.FS.writeFile(`/lib/${m}.py`, src);
-    }
-    pyodide.runPython("import sys; sys.path.insert(0, '/lib')");
-    log('API SPIKE 3 chargée.', 'ok');
-  } catch (e) {
-    log('Erreur init Pyodide : ' + e.message, 'err');
-    console.error(e);
-  }
-})();
+// Initialiser Pyodide dans un Web Worker (n'empêche pas le chargement mat/robot).
+// Le worker permet d'interrompre des boucles Python pures (while True: pass) :
+// le main thread reste libre pour gérer le clic Stop.
+log('Chargement de Pyodide (worker)...', 'info');
+const pyodideReady = initRunner(scene, log).then(r => {
+  if (r?.ready) log('API SPIKE 3 chargée.', 'ok');
+  return r;
+});
 
 // --- Boutons run/stop ---
 document.getElementById('run-btn').onclick = async () => {
-  if (!pyodide) {
-    log('Pyodide pas encore prêt, patientez...', 'info');
-    await pyodideReady;
-    if (!pyodide) { log('Pyodide indisponible.', 'err'); return; }
-  }
+  const r = await pyodideReady;
+  if (!r?.ready) { log('Pyodide indisponible.', 'err'); return; }
   const code = getActiveCode();
   if (!code.trim()) { log('Code vide.', 'err'); return; }
   simStatus.textContent = 'En cours...';
   try {
-    const result = await runPython(pyodide, code, scene, log);
+    const result = await runPython(code);
     simStatus.textContent = result?.stopped ? 'Arrêté' : 'Terminé';
   } catch (e) {
     log(String(e), 'err');
@@ -355,11 +333,6 @@ document.getElementById('run-btn').onclick = async () => {
 
 document.getElementById('stop-btn').onclick = () => {
   stopPython();
-  // Force l'arrêt des moteurs même si plus aucun Python ne tourne
-  // (cas typique : motor.run() lancé puis main() terminé).
-  for (const port of ['A', 'B', 'C', 'D', 'E', 'F']) {
-    scene.controller.stopMotor(port);
-  }
   simStatus.textContent = 'Arrêté';
 };
 

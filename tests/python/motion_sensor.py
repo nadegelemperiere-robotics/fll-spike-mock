@@ -9,6 +9,7 @@ async def main():
     motor_pair.pair(motor_pair.PAIR_1,port.A,port.E)
 
     motion_sensor.set_yaw_face(motion_sensor.TOP)
+    print(motion_sensor.get_yaw_face())
 
     motion_sensor.reset_yaw()
     while motion_sensor.tilt_angles()[0] < 900 :
@@ -29,6 +30,7 @@ async def main():
 
 
     motion_sensor.set_yaw_face(motion_sensor.BOTTOM)
+    print(motion_sensor.get_yaw_face())
 
     motion_sensor.reset_yaw()
     while motion_sensor.tilt_angles()[0] > -900 :
@@ -39,6 +41,7 @@ async def main():
 
     motion_sensor.reset_yaw()
     motion_sensor.set_yaw_face(motion_sensor.FRONT)
+    print(motion_sensor.get_yaw_face())
     while motion_sensor.tilt_angles()[2] < 900 :
         motor_pair.move(motor_pair.PAIR_1,100,velocity=50)
         await runloop.sleep_ms(100)
@@ -49,6 +52,7 @@ async def main():
     motion_sensor.set_yaw_face(motion_sensor.TOP)
     motion_sensor.reset_yaw()
     motion_sensor.set_yaw_face(motion_sensor.BACK)
+    print(motion_sensor.get_yaw_face())
 
     while motion_sensor.tilt_angles()[2] > -900 :
         motor_pair.move(motor_pair.PAIR_1,100,velocity=50)
@@ -59,6 +63,7 @@ async def main():
     motion_sensor.set_yaw_face(motion_sensor.TOP)
     motion_sensor.reset_yaw()
     motion_sensor.set_yaw_face(motion_sensor.LEFT)
+    print(motion_sensor.get_yaw_face())
 
     while motion_sensor.tilt_angles()[1] > -900 :
         motor_pair.move(motor_pair.PAIR_1,100,velocity=50)
@@ -70,6 +75,7 @@ async def main():
     motion_sensor.set_yaw_face(motion_sensor.TOP)
     motion_sensor.reset_yaw()
     motion_sensor.set_yaw_face(motion_sensor.RIGHT)
+    print(motion_sensor.get_yaw_face())
 
     while motion_sensor.tilt_angles()[1] < 900 :
         motor_pair.move(motor_pair.PAIR_1,100,velocity=50)

@@ -133,12 +133,13 @@ light_matrix = _LightMatrix()
 
 
 class _Button:
-    LEFT = 1
+    """hub.button — API stricte SPIKE App 3 : pressed(button)."""
+    LEFT  = 1
     RIGHT = 2
-    POWER = 0
 
     def pressed(self, button):
-        return 0
+        """Durée d'appui (ms) depuis le dernier appui ; 0 si pas appuyé."""
+        return int(_b.hubButtonPressed(int(button)))
 
 
 button = _Button()

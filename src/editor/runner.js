@@ -1,113 +1,223 @@
-// src/editor/runner.js — Exécute le code Python (SPIKE 3) dans Pyodide.
-// L'utilisateur appelle `runloop.run(main())`. Le module runloop enregistre
-// la coroutine ; après runPythonAsync, on l'attend explicitement.
+// src/editor/runner.js — Manage Pyodide-in-worker + shared state mirror.
+// Pyodide tourne dans un Web Worker pour que le main thread reste libre :
+//  - les rAF (animation 3D) continuent même quand Python boucle sans await
+//  - les clics (Stop) atteignent toujours le handler JS, qui pose SIGINT
+//    dans le SAB d'interruption de Pyodide → KeyboardInterrupt côté Python.
+//
+// Les lectures synchrones du bridge Python (getMotorPosition, getHeading,
+// getColor, …) lisent un Float64Array partagé qu'on rafraîchit ici à chaque
+// frame. Les écritures (setMotor, hubMatrix*, …) arrivent en postMessage et
+// sont appliquées au scene controller / hub display.
 
 const STOP_MARKER = 'Stop demandé.';
-let stopRequested = false;
 
-export function stopPython() { stopRequested = true; }
+// --- Layout du miroir partagé (doit matcher python-worker.js) ---
+const F = {
+  HEADING: 0,
+  ANGULAR_VEL: 1,
+  PORT_BASE: 8,
+  PORT_STRIDE: 16,
+};
+const PF = {
+  POS: 0, VEL: 1, COLOR: 2, REFL: 3,
+  R: 4, G: 5, B: 6, I: 7,
+  DIST: 8, FORCE: 9,
+};
+const I = {
+  STOP: 0,
+  BTN_LEFT: 1,
+  BTN_RIGHT: 2,
+};
 
-export async function runPython(pyodide, code, scene, log) {
-  stopRequested = false;
+const SPIKE3_MODULES = [
+  '_sim', 'hub', 'motor', 'motor_pair', 'color', 'orientation',
+  'color_sensor', 'distance_sensor', 'force_sensor', 'runloop',
+];
 
-  const bridge = {
-    log: (s) => log(String(s), 'log'),
-    sleep: async (sec) => {
-      const t0 = performance.now();
-      while ((performance.now() - t0) < sec * 1000) {
-        if (stopRequested) throw new Error(STOP_MARKER);
-        await new Promise(r => setTimeout(r, 16));
-      }
-    },
-    setMotor: (port, velocity) => scene.controller.setMotorVelocity(port, velocity),
-    stopMotor: (port) => scene.controller.stopMotor(port),
-    getMotorPosition: (port) => scene.controller.getMotorPosition(port),
-    getMotorVelocity: (port) => scene.controller.getMotorVelocity(port),
-    getHeading: () => scene.controller.getHeading(),
-    getAngularVelocity: () => scene.controller.getAngularVelocity(),
-    setMotorPair: (left, right) => scene.controller.setMotorPair(left, right),
-    setMotionYawFace: (face) => scene.controller.setMotionYawFace(face),
-    setMotionTBOffset: (rad) => scene.controller.setMotionTBOffset(rad),
-    getColor: (port) => scene.controller.readColorSensor(port),
-    getReflectedLight: (port) => scene.controller.readReflectedLight(port),
-    getDistance: (port) => scene.controller.readDistanceSensor(port),
-    getForce: (port) => scene.controller.readForceSensor(port),
-    isStopped: () => stopRequested,
-    requestStop: () => {
-      // Équivalent du bouton Stop : arrête moteurs et lève le flag.
-      stopRequested = true;
-      for (const port of ['A', 'B', 'C', 'D', 'E', 'F']) {
-        scene.controller.stopMotor(port);
-      }
-    },
-    // Hub display (matrice 5x5 + bouton power) — affichage live au-dessus du mat.
-    hubMatrixSetPixel: (x, y, intensity) => window.hubDisplay?.setPixel(x, y, intensity),
-    hubMatrixClear:    () => window.hubDisplay?.clear(),
-    hubMatrixShow:     (imageId) => window.hubDisplay?.showImage(imageId),
-    hubMatrixWrite:    (text) => window.hubDisplay?.write(String(text)),
-    hubMatrixBrightness: (pct) => window.hubDisplay?.setBrightness(pct),
-    hubMatrixRotate:   (dir) => window.hubDisplay?.rotate(dir),
-    hubMatrixOrientation: (ori) => window.hubDisplay?.setOrientation(ori),
-    hubButtonLight:    (r, g, b) => window.hubDisplay?.setButtonColor(r, g, b),
-    hubLightColor:     (lightId, colorId) => window.hubDisplay?.setLightColor(lightId, colorId),
+function portFloat(port, off) {
+  const idx = 'ABCDEF'.indexOf(String(port || '').toUpperCase());
+  if (idx < 0) return -1;
+  return F.PORT_BASE + idx * F.PORT_STRIDE + off;
+}
+
+let worker = null;
+let workerReady = false;
+let readyResolvers = [];
+let runResolver = null;
+let logFn = null;
+let sceneRef = null;
+
+let floatBuffer = null;
+let intBuffer = null;
+let interruptBuffer = null;
+let floatMirror = null;
+let int32Mirror = null;
+let interruptMirror = null;
+
+let mirrorRafHandle = 0;
+
+async function fetchModules() {
+  const cacheBust = Date.now();
+  const out = {};
+  for (const m of SPIKE3_MODULES) {
+    out[m] = await fetch(`src/api/${m}.py?v=${cacheBust}`, { cache: 'no-store' }).then(r => r.text());
+  }
+  return out;
+}
+
+export async function initRunner(scene, log) {
+  sceneRef = scene;
+  logFn = log;
+
+  if (typeof SharedArrayBuffer === 'undefined' || !self.crossOriginIsolated) {
+    log("SharedArrayBuffer indisponible (page pas isolée). Recharge la page : le service worker COOP/COEP doit s'installer au premier chargement.", 'err');
+    return null;
+  }
+
+  floatBuffer     = new SharedArrayBuffer(128 * 8);
+  intBuffer       = new SharedArrayBuffer(32 * 4);
+  interruptBuffer = new SharedArrayBuffer(1);
+  floatMirror     = new Float64Array(floatBuffer);
+  int32Mirror     = new Int32Array(intBuffer);
+  interruptMirror = new Uint8Array(interruptBuffer);
+
+  worker = new Worker(new URL('./python-worker.js', import.meta.url), { type: 'classic' });
+  worker.onmessage = onWorkerMessage;
+  worker.onerror = (e) => {
+    log(`Worker error: ${e.message || e}`, 'err');
+    if (runResolver) { runResolver.resolve({ stopped: false }); runResolver = null; }
   };
 
-  pyodide.registerJsModule('_sim_bridge', bridge);
+  const apiModules = await fetchModules();
+  worker.postMessage({
+    type: 'init',
+    floatBuffer, intBuffer, interruptBuffer,
+    apiModules,
+  });
 
-  // Rediriger print() / sys.stderr vers la console UI
-  pyodide.setStdout({ batched: (s) => log(s, 'log') });
-  pyodide.setStderr({ batched: (s) => log(s, 'err') });
+  await new Promise((resolve) => readyResolvers.push(resolve));
+  startMirrorLoop();
+  return { ready: true };
+}
 
-  // Reset visuel du hub à chaque run
-  window.hubDisplay?.reset();
-
-  let stopped = false;
-  let errored = false;
-  try {
-    // Reset des états Python qui persistent entre runs (modules cachés par Pyodide).
-    await pyodide.runPythonAsync(`
-import sys
-_m = sys.modules.get('motor')
-if _m is not None and hasattr(_m, '_default_pct'):
-    _m._default_pct.clear()
-_mp = sys.modules.get('motor_pair')
-if _mp is not None:
-    _mp._pairs.clear()
-_h = sys.modules.get('hub')
-if _h is not None and hasattr(_h, 'motion_sensor'):
-    _h.motion_sensor._tb_offset_rad = 0.0
-    _h.motion_sensor._yaw_face = _h.motion_sensor.TOP
-import _sim_bridge as _sb
-_sb.setMotionYawFace(0)
-_sb.setMotionTBOffset(0)
-`);
-
-    await pyodide.runPythonAsync(code);
-    await pyodide.runPythonAsync(`
-import runloop as _rl
-if _rl._main_coro is not None:
-    _coro = _rl._main_coro
-    _rl._main_coro = None
-    await _coro
-`);
-  } catch (e) {
-    const msg = e.message || String(e);
-    if (msg.includes(STOP_MARKER)) {
-      stopped = true;
-      log('Exécution arrêtée.', 'info');
-    } else {
-      errored = true;
-      log(msg, 'err');
-      throw e;
+function onWorkerMessage(e) {
+  const msg = e.data;
+  if (!msg) return;
+  if (msg.kind === 'ready') {
+    workerReady = true;
+    readyResolvers.forEach(r => r(true));
+    readyResolvers = [];
+  } else if (msg.kind === 'init-error') {
+    logFn?.('Erreur init Pyodide : ' + msg.message, 'err');
+    readyResolvers.forEach(r => r(false));
+    readyResolvers = [];
+  } else if (msg.kind === 'log') {
+    logFn?.(msg.s, msg.level || 'log');
+  } else if (msg.kind === 'cmd') {
+    handleCommand(msg.type, msg.args);
+  } else if (msg.kind === 'done') {
+    if (msg.stopped || msg.errored) {
+      // Sur Stop ou erreur, on coupe les moteurs. Si main() s'est terminé
+      // normalement, on laisse motor.run() continuer (parité avec l'ancien comportement).
+      const c = sceneRef?.controller;
+      if (c) for (const p of 'ABCDEF') c.stopMotor(p);
     }
-  } finally {
-    // On stoppe les moteurs uniquement sur Stop explicite ou erreur.
-    // Si main() se termine normalement, on laisse motor.run() continuer.
-    if (stopped || errored) {
-      for (const port of ['A', 'B', 'C', 'D', 'E', 'F']) {
-        scene.controller.stopMotor(port);
+    if (runResolver) { runResolver.resolve({ stopped: msg.stopped }); runResolver = null; }
+  }
+}
+
+function handleCommand(type, args) {
+  const c = sceneRef?.controller;
+  const hd = (typeof window !== 'undefined') ? window.hubDisplay : null;
+  if (!c) return;
+  switch (type) {
+    case 'setMotor':       c.setMotorVelocity(args[0], args[1]); break;
+    case 'stopMotor':      c.stopMotor(args[0]); break;
+    case 'setMotorPair':   c.setMotorPair(args[0], args[1]); break;
+    case 'setMotionYawFace':  c.setMotionYawFace(args[0]); break;
+    case 'setMotionTBOffset': c.setMotionTBOffset(args[0]); break;
+    case 'requestStop':
+      Atomics.store(int32Mirror, I.STOP, 1);
+      interruptMirror[0] = 2;
+      for (const p of 'ABCDEF') c.stopMotor(p);
+      break;
+    case 'hubMatrixSetPixel':    hd?.setPixel(args[0], args[1], args[2]); break;
+    case 'hubMatrixClear':       hd?.clear(); break;
+    case 'hubMatrixShow':        hd?.showImage(args[0]); break;
+    case 'hubMatrixWrite':       hd?.write(args[0]); break;
+    case 'hubMatrixBrightness':  hd?.setBrightness(args[0]); break;
+    case 'hubMatrixRotate':      hd?.rotate(args[0]); break;
+    case 'hubMatrixOrientation': hd?.setOrientation(args[0]); break;
+    case 'hubButtonLight':       hd?.setButtonColor(args[0], args[1], args[2]); break;
+    case 'hubLightColor':        hd?.setLightColor(args[0], args[1]); break;
+  }
+}
+
+function setSensorFloat(idx, v) {
+  floatMirror[idx] = (v === null || v === undefined) ? NaN : v;
+}
+
+// Boucle qui rafraîchit le miroir partagé à chaque frame. Le worker lit
+// les valeurs synchrones depuis ce miroir (motor pos/vel, heading, sensors…).
+function startMirrorLoop() {
+  if (mirrorRafHandle) cancelAnimationFrame(mirrorRafHandle);
+  function tick() {
+    const c = sceneRef?.controller;
+    if (c) {
+      // Motors
+      for (const port of 'ABCDEF') {
+        floatMirror[portFloat(port, PF.POS)] = c.getMotorPosition(port);
+        floatMirror[portFloat(port, PF.VEL)] = c.getMotorVelocity(port);
+      }
+      // Motion
+      floatMirror[F.HEADING]     = c.getHeading();
+      floatMirror[F.ANGULAR_VEL] = c.getAngularVelocity();
+      // Sensors (NaN si capteur absent → bridge Python renvoie None)
+      for (const port of 'ABCDEF') {
+        setSensorFloat(portFloat(port, PF.COLOR), c.readColorSensor(port));
+        setSensorFloat(portFloat(port, PF.REFL),  c.readReflectedLight(port));
+        const rgbi = c.readColorRGBI(port);
+        if (rgbi) {
+          floatMirror[portFloat(port, PF.R)] = rgbi[0];
+          floatMirror[portFloat(port, PF.G)] = rgbi[1];
+          floatMirror[portFloat(port, PF.B)] = rgbi[2];
+          floatMirror[portFloat(port, PF.I)] = rgbi[3];
+        } else {
+          floatMirror[portFloat(port, PF.R)] = NaN;
+        }
+        setSensorFloat(portFloat(port, PF.DIST),  c.readDistanceSensor(port));
+        setSensorFloat(portFloat(port, PF.FORCE), c.readForceSensor(port));
       }
     }
+    // Buttons (ms écoulées depuis l'appui)
+    const hd = (typeof window !== 'undefined') ? window.hubDisplay : null;
+    if (hd) {
+      Atomics.store(int32Mirror, I.BTN_LEFT,  Math.floor(hd.getButtonPressed?.(1) || 0));
+      Atomics.store(int32Mirror, I.BTN_RIGHT, Math.floor(hd.getButtonPressed?.(2) || 0));
+    }
+    mirrorRafHandle = requestAnimationFrame(tick);
   }
-  return { stopped };
+  mirrorRafHandle = requestAnimationFrame(tick);
+}
+
+export async function runPython(code) {
+  if (!workerReady) throw new Error('Pyodide pas encore prêt.');
+  // Reset visuel du hub à chaque run
+  (typeof window !== 'undefined') && window.hubDisplay?.reset();
+  Atomics.store(int32Mirror, I.STOP, 0);
+  interruptMirror[0] = 0;
+
+  worker.postMessage({ type: 'run', code });
+  return new Promise((resolve, reject) => {
+    runResolver = { resolve, reject };
+  });
+}
+
+export function stopPython() {
+  if (!int32Mirror) return;
+  Atomics.store(int32Mirror, I.STOP, 1);
+  if (interruptMirror) interruptMirror[0] = 2;  // SIGINT → KeyboardInterrupt
+  // Force l'arrêt des moteurs même si plus aucun Python ne tourne.
+  const c = sceneRef?.controller;
+  if (c) for (const p of 'ABCDEF') c.stopMotor(p);
 }

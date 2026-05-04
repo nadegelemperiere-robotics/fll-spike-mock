@@ -108,10 +108,44 @@ export class HubDisplay {
     this.matrixEl = document.getElementById('hub-matrix');
     this.buttonEl = document.getElementById('hub-power-btn');
     this.bluetoothEl = document.getElementById('hub-bluetooth-btn');
+    this.leftBtnEl = document.getElementById('hub-left-btn');
+    this.rightBtnEl = document.getElementById('hub-right-btn');
     this.writeEl = document.getElementById('hub-write-text');
     this.pixelEls = [];
+    // État des boutons physiques : timestamp d'appui (ou null si relâché)
+    this.btnPressed = { 1: null, 2: null };  // 1=LEFT, 2=RIGHT
     this._build();
+    this._setupPhysicalButtons();
     this._scrollTimer = null;
+  }
+
+  _setupPhysicalButtons() {
+    const wire = (el, id) => {
+      if (!el) return;
+      const press = (e) => {
+        if (this.btnPressed[id] !== null) return;
+        this.btnPressed[id] = performance.now();
+        el.classList.add('pressed');
+        el.setPointerCapture?.(e.pointerId);
+      };
+      const release = () => {
+        if (this.btnPressed[id] === null) return;
+        this.btnPressed[id] = null;
+        el.classList.remove('pressed');
+      };
+      el.addEventListener('pointerdown', press);
+      el.addEventListener('pointerup', release);
+      el.addEventListener('pointerleave', release);
+      el.addEventListener('pointercancel', release);
+    };
+    wire(this.leftBtnEl, 1);
+    wire(this.rightBtnEl, 2);
+  }
+
+  getButtonPressed(buttonId) {
+    const t0 = this.btnPressed[buttonId];
+    if (t0 == null) return 0;
+    return Math.floor(performance.now() - t0);
   }
 
   _build() {

@@ -177,27 +177,27 @@ function updateSensorReadout(state) {
     case 2: pitchDeg =  tbDeg; break; // RIGHT
     case 5: pitchDeg = -tbDeg; break; // LEFT
   }
+  const ypr = `y=${yawDeg.toFixed(0)}° · p=${pitchDeg.toFixed(0)}° · r=${rollDeg.toFixed(0)}°`;
   const lines = [
-    `<div class="sensor-line"><span>yaw</span><span class="v">${yawDeg.toFixed(1)}°</span></div>`,
-    `<div class="sensor-line"><span>pitch</span><span class="v">${pitchDeg.toFixed(1)}°</span></div>`,
-    `<div class="sensor-line"><span>roll</span><span class="v">${rollDeg.toFixed(1)}°</span></div>`,
+    `<div class="sensor-line"><span>tilt</span><span class="v">${ypr}</span></div>`,
   ];
   for (const s of state.robotModel.sensors) {
     if (s.type === 'color_sensor') {
       const c = state.controller.readColorSensor(s.port);
       const r = state.controller.readReflectedLight(s.port);
       lines.push(
-        `<div class="sensor-line"><span>port ${s.port} couleur</span><span class="v">${c || '—'} (${r})</span></div>`
+        `<div class="sensor-line"><span>color ${s.port}</span>` +
+        `<span class="v">${c || '—'} · ${r}%</span></div>`
       );
     } else if (s.type === 'distance_sensor') {
       const d = state.controller.readDistanceSensor(s.port);
       lines.push(
-        `<div class="sensor-line"><span>port ${s.port} dist</span><span class="v">${d} cm</span></div>`
+        `<div class="sensor-line"><span>dist ${s.port}</span><span class="v">${d} cm</span></div>`
       );
     } else if (s.type === 'force_sensor') {
       const f = state.controller.readForceSensor(s.port);
       lines.push(
-        `<div class="sensor-line"><span>port ${s.port} force</span><span class="v">${f} N</span></div>`
+        `<div class="sensor-line"><span>force ${s.port}</span><span class="v">${f} N</span></div>`
       );
     }
   }
@@ -437,6 +437,10 @@ function makeController(state) {
     readReflectedLight(port) {
       if (!state.sensors) return 0;
       return state.sensors.readReflected(port);
+    },
+    readColorRGBI(port) {
+      if (!state.sensors) return [0, 0, 0, 0];
+      return state.sensors.readRGBI(port);
     },
     readDistanceSensor(port) {
       if (!state.sensors) return 200;
