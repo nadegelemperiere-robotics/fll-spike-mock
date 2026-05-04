@@ -326,9 +326,12 @@ function stepKinematics(state, dt) {
   }
 
   // Vitesse linéaire des roues (mm/s) = (deg/s) * (π * D / 360)
+  // Le moteur droit est monté en miroir du gauche : pour une commande positive
+  // identique aux deux moteurs, le moteur gauche fait avancer la roue, le droit
+  // la fait reculer. On reflète ce comportement réel SPIKE en inversant rVel.
   const D = robotModel.wheelDiameterMm;
   const lVel = lDegS * Math.PI * D / 360;
-  const rVel = rDegS * Math.PI * D / 360;
+  const rVel = -rDegS * Math.PI * D / 360;
 
   // Cinématique différentielle. heading=0 => avance vers -Z.
   const v = (lVel + rVel) / 2;
