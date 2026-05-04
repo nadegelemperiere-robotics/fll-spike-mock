@@ -1,4 +1,9 @@
-"""motor_pair — pilotage en paire (drive base) (SPIKE App 3)."""
+"""motor_pair — pilotage en paire (drive base) — API SPIKE App 3 stricte.
+
+Fonctions exposées (et seulement celles-ci) :
+    pair, unpair, move, move_for_degrees, move_for_time,
+    move_tank, move_tank_for_degrees, move_tank_for_time, stop
+"""
 from _sim import _b, _to_letter
 import motor as _motor
 
@@ -10,6 +15,7 @@ _pairs = {}
 
 
 def pair(pair_id, left_motor, right_motor):
+    """Configure une paire. Premier port = gauche, second = droit."""
     _pairs[pair_id] = (_to_letter(left_motor), _to_letter(right_motor))
 
 

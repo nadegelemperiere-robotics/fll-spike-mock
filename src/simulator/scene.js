@@ -302,6 +302,55 @@ function frontAxisToRotation(front) {
   }
 }
 
+// Applique les overrides de ports déclarés dans la config robot.
+// On identifie gauche/droit par la position (axe avec le plus de variance entre
+// les composants), puis on impose le port spécifié par l'utilisateur.
+function applyPortConfig(model, components, config) {
+  if (!config) return;
+
+  function lateralAxis(arr) {
+    if (arr.length < 2) return 0;
+    const xs = arr.map(c => c.position[0]);
+    const zs = arr.map(c => c.position[2]);
+    const varX = Math.max(...xs) - Math.min(...xs);
+    const varZ = Math.max(...zs) - Math.min(...zs);
+    return varX >= varZ ? 0 : 2;
+  }
+
+  // Moteurs propulsifs
+  if (config.left_motor || config.right_motor) {
+    const motors = components.filter(c => c.type === 'motor');
+    if (motors.length >= 2) {
+      const axis = lateralAxis(motors);
+      const sorted = [...motors].sort((a, b) => a.position[axis] - b.position[axis]);
+      const leftM = sorted[0];
+      const rightM = sorted[sorted.length - 1];
+      if (config.left_motor) leftM.port = config.left_motor;
+      if (config.right_motor) rightM.port = config.right_motor;
+      model.leftPort = leftM.port;
+      model.rightPort = rightM.port;
+      model.leftMotor = leftM;
+      model.rightMotor = rightM;
+    }
+  }
+
+  // Capteurs couleur
+  if (config.color_sensors) {
+    const sensors = components.filter(c => c.type === 'color_sensor');
+    if (sensors.length >= 1) {
+      const axis = sensors.length >= 2 ? lateralAxis(sensors) : 0;
+      const sorted = [...sensors].sort((a, b) => a.position[axis] - b.position[axis]);
+      if (config.color_sensors.left && sorted[0]) {
+        sorted[0].port = config.color_sensors.left;
+      }
+      if (config.color_sensors.right && sorted[sorted.length - 1]) {
+        sorted[sorted.length - 1].port = config.color_sensors.right;
+      }
+    }
+  }
+}
+
+
 function applyRobotPose(state) {
   if (!state.robot) return;
   state.robot.position.set(state.robotState.x, 5, state.robotState.z);
@@ -351,6 +400,14 @@ function makeController(state) {
     getMotorPosition(port) { return state.robotState.motorPos[port] || 0; },
     getMotorVelocity(port) { return state.robotState.motorVel[port] || 0; },
     getHeading() { return state.robotState.heading; },
+    setMotorPair(leftPort, rightPort) {
+      // Permet à motor_pair.pair() d'imposer les ports gauche/droit utilisés
+      // par la cinématique, plutôt que ceux devinés par robot-builder.
+      if (state.robotModel) {
+        state.robotModel.leftPort = leftPort;
+        state.robotModel.rightPort = rightPort;
+      }
+    },
     readColorSensor(port) {
       if (!state.sensors) return null;
       return state.sensors.readColor(port);
@@ -450,6 +507,10 @@ export async function loadRobot(state, ldrText, config = {}) {
   const model = buildRobotModel(components);
   model.frontRotation = 0;
   model.config = config;
+
+  // Surcharge des ports depuis la config robot : prend le pas sur la détection
+  // auto. Permet d'imposer left_motor / right_motor / color_sensors.left / right.
+  applyPortConfig(model, components, config);
 
   // Recentrer sur le milieu des deux roues motrices : c'est le repère naturel
   // de la cinématique différentielle (un moteur arrêté => pivot autour de cette roue).

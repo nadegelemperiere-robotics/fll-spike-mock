@@ -2,5 +2,11 @@
   "name": "Advanced Driving Base",
   "model": "advanced-base.io",
   "front": "-z",
-  "notes": "front : direction de l'avant du robot dans le repère du fichier LDraw. Valeurs admises : '+x', '-x', '+z', '-z'. Le simulateur fait tourner le modèle pour aligner cette direction avec -Z (convention : heading=0 = robot face au nord du mat)."
+  "left_motor": "A",
+  "right_motor": "E",
+  "color_sensors": {
+    "left": "C",
+    "right": "F"
+  },
+  "notes": "front : direction (+x|-x|+z|-z) de l'avant du robot dans le repère LDraw. left_motor/right_motor : ports forcés des moteurs de propulsion (sinon détection auto par position X). color_sensors.left/right : ports forcés des capteurs couleur (sinon détection auto)."
 }

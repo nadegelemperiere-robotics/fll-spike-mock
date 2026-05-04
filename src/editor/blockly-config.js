@@ -5,9 +5,9 @@
 const C = {
   motor:     '#3f8eee',  // Bleu SPIKE
   events:    '#FFBF00',
-  movement:  '#9966FF',
+  movement:  '#EC5AC8',  // Rose SPIKE
   light:     '#0FBD8C',
-  sound:     '#CF63CF',
+  sound:     '#E665A4',
   sensors:   '#5CB1D6',
   control:   '#FFAB19',
   operators: '#59C059',
@@ -25,6 +25,24 @@ const MOTOR_ICON_URL = 'data:image/svg+xml;base64,' + btoa(
   '</svg>'
 );
 const MOTOR_ICON = { type: 'field_image', src: MOTOR_ICON_URL, width: 22, height: 22, alt: '' };
+
+// Icône double moteur (roue avant/arrière côte à côte) — pour les blocs Movement.
+const DRIVE_ICON_URL = 'data:image/svg+xml;base64,' + btoa(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 24">' +
+  '<circle cx="9" cy="12" r="9" fill="white"/>' +
+  '<circle cx="9" cy="12" r="2.5" fill="#EC5AC8"/>' +
+  '<circle cx="9" cy="5" r="1.7" fill="#EC5AC8"/>' +
+  '<circle cx="9" cy="19" r="1.7" fill="#EC5AC8"/>' +
+  '<circle cx="2" cy="12" r="1.7" fill="#EC5AC8"/>' +
+  '<circle cx="16" cy="12" r="1.7" fill="#EC5AC8"/>' +
+  '<circle cx="23" cy="12" r="9" fill="white"/>' +
+  '<circle cx="23" cy="12" r="2.5" fill="#EC5AC8"/>' +
+  '<circle cx="23" cy="5" r="1.7" fill="#EC5AC8"/>' +
+  '<circle cx="23" cy="19" r="1.7" fill="#EC5AC8"/>' +
+  '<circle cx="30" cy="12" r="1.7" fill="#EC5AC8"/>' +
+  '</svg>'
+);
+const DRIVE_ICON = { type: 'field_image', src: DRIVE_ICON_URL, width: 30, height: 22, alt: '' };
 
 const PORT_OPTIONS = [['A','A'],['B','B'],['C','C'],['D','D'],['E','E'],['F','F']];
 const COLOR_OPTIONS = [
@@ -83,19 +101,20 @@ const TOOLBOX = {
       ]
     },
     {
-      kind: 'category', name: 'Events', colour: C.events, contents: [
-        tb('event_when_started'),
+      kind: 'category', name: 'Movement', colour: C.movement, contents: [
+        tb('movement_move_dir_for',           { N: 10 }),
+        tb('movement_move_steer_for',         { STEER: 0, N: 10 }),
+        tb('movement_start_dir'),
+        tb('movement_start_steer',            { STEER: 0 }),
+        tb('movement_stop'),
+        tb('movement_set_motors'),
+        tb('movement_set_speed',              { PCT: 50 }),
+        tb('movement_set_distance_per_rotation', { AMOUNT: 17.5 }),
       ]
     },
     {
-      kind: 'category', name: 'Movement', colour: C.movement, contents: [
-        tb('movement_set_motors'),
-        tb('movement_move_for_time',    { T: 2, STEER: 0, V: 360 }),
-        tb('movement_move_for_degrees', { D: 360, STEER: 0, V: 360 }),
-        tb('movement_start',            { STEER: 0, V: 360 }),
-        tb('movement_stop'),
-        tb('movement_tank_for_time',    { T: 2, L: 360, R: 360 }),
-        tb('movement_tank_for_degrees', { D: 360, L: 360, R: 360 }),
+      kind: 'category', name: 'Events', colour: C.events, contents: [
+        tb('event_when_started'),
       ]
     },
     {
@@ -163,71 +182,101 @@ function defineBlocks() {
       tooltip: 'Program entry point.',
     },
 
-    // === Movement (motor_pair) ===
+    // === Movement (style app SPIKE) ===
     {
-      type: 'movement_set_motors',
-      message0: 'set movement motors to left %1 right %2',
+      type: 'movement_move_dir_for',
+      message0: '%1 move %2 for %3 %4',
       args0: [
-        { type: 'field_dropdown', name: 'L', options: PORT_OPTIONS },
-        { type: 'field_dropdown', name: 'R', options: PORT_OPTIONS },
-      ],
-      previousStatement: null, nextStatement: null, colour: C.movement,
-    },
-    {
-      type: 'movement_move_for_time',
-      message0: 'move for %1 seconds, steering %2, at %3 deg/s',
-      args0: [
-        { type: 'input_value', name: 'T', check: 'Number' },
-        { type: 'input_value', name: 'STEER', check: 'Number' },
-        { type: 'input_value', name: 'V', check: 'Number' },
-      ],
-      previousStatement: null, nextStatement: null, colour: C.movement,
-      inputsInline: true,
-    },
-    {
-      type: 'movement_move_for_degrees',
-      message0: 'move %1 ° (left motor), steering %2, at %3 deg/s',
-      args0: [
-        { type: 'input_value', name: 'D', check: 'Number' },
-        { type: 'input_value', name: 'STEER', check: 'Number' },
-        { type: 'input_value', name: 'V', check: 'Number' },
+        DRIVE_ICON,
+        { type: 'field_dropdown', name: 'DIR', options: [
+          ['↑', 'FORWARD'],
+          ['↓', 'BACKWARD'],
+        ] },
+        { type: 'input_value', name: 'N', check: 'Number' },
+        { type: 'field_dropdown', name: 'UNIT', options: [
+          ['rotations', 'rotations'],
+          ['degrees', 'degrees'],
+          ['seconds', 'seconds'],
+          ['cm', 'cm'],
+          ['inches', 'inches'],
+        ] },
       ],
       previousStatement: null, nextStatement: null, colour: C.movement,
       inputsInline: true,
     },
     {
-      type: 'movement_start',
-      message0: 'start moving steering %1 at %2 deg/s',
+      type: 'movement_move_steer_for',
+      message0: '%1 move steering %2 for %3 %4',
       args0: [
+        DRIVE_ICON,
         { type: 'input_value', name: 'STEER', check: 'Number' },
-        { type: 'input_value', name: 'V', check: 'Number' },
+        { type: 'input_value', name: 'N', check: 'Number' },
+        { type: 'field_dropdown', name: 'UNIT', options: [
+          ['rotations', 'rotations'],
+          ['degrees', 'degrees'],
+          ['seconds', 'seconds'],
+          ['cm', 'cm'],
+          ['inches', 'inches'],
+        ] },
+      ],
+      previousStatement: null, nextStatement: null, colour: C.movement,
+      inputsInline: true,
+    },
+    {
+      type: 'movement_start_dir',
+      message0: '%1 start moving %2',
+      args0: [
+        DRIVE_ICON,
+        { type: 'field_dropdown', name: 'DIR', options: [
+          ['↑', 'FORWARD'],
+          ['↓', 'BACKWARD'],
+        ] },
+      ],
+      previousStatement: null, nextStatement: null, colour: C.movement,
+    },
+    {
+      type: 'movement_start_steer',
+      message0: '%1 start moving steering %2',
+      args0: [
+        DRIVE_ICON,
+        { type: 'input_value', name: 'STEER', check: 'Number' },
       ],
       previousStatement: null, nextStatement: null, colour: C.movement,
       inputsInline: true,
     },
     {
       type: 'movement_stop',
-      message0: 'stop moving',
+      message0: '%1 stop moving',
+      args0: [DRIVE_ICON],
       previousStatement: null, nextStatement: null, colour: C.movement,
     },
     {
-      type: 'movement_tank_for_time',
-      message0: 'tank for %1 seconds: left %2, right %3 deg/s',
+      type: 'movement_set_motors',
+      message0: '%1 set movement motors to %2 + %3',
       args0: [
-        { type: 'input_value', name: 'T', check: 'Number' },
-        { type: 'input_value', name: 'L', check: 'Number' },
-        { type: 'input_value', name: 'R', check: 'Number' },
+        DRIVE_ICON,
+        { type: 'field_dropdown', name: 'L', options: PORT_OPTIONS },
+        { type: 'field_dropdown', name: 'R', options: PORT_OPTIONS },
+      ],
+      previousStatement: null, nextStatement: null, colour: C.movement,
+    },
+    {
+      type: 'movement_set_speed',
+      message0: '%1 set movement speed to %2 %%',
+      args0: [
+        DRIVE_ICON,
+        { type: 'input_value', name: 'PCT', check: 'Number' },
       ],
       previousStatement: null, nextStatement: null, colour: C.movement,
       inputsInline: true,
     },
     {
-      type: 'movement_tank_for_degrees',
-      message0: 'tank for %1 °: left %2, right %3 deg/s',
+      type: 'movement_set_distance_per_rotation',
+      message0: '%1 set 1 motor rotation to %2 %3 moved',
       args0: [
-        { type: 'input_value', name: 'D', check: 'Number' },
-        { type: 'input_value', name: 'L', check: 'Number' },
-        { type: 'input_value', name: 'R', check: 'Number' },
+        DRIVE_ICON,
+        { type: 'input_value', name: 'AMOUNT', check: 'Number' },
+        { type: 'field_dropdown', name: 'UNIT', options: [['cm', 'cm'], ['inches', 'inches']] },
       ],
       previousStatement: null, nextStatement: null, colour: C.movement,
       inputsInline: true,
@@ -307,6 +356,8 @@ function defineBlocks() {
       ],
       output: 'Number', colour: C.motor,
     },
+
+    // === Motor (SPIKE app style) ===
     {
       type: 'spike_motor_position',
       message0: '%1 %2 position',
@@ -353,6 +404,7 @@ function defineBlocks() {
       type: 'sensor_is_color',
       message0: 'is color on port %1 %2 ?',
       args0: [
+        MOTOR_ICON,
         { type: 'field_dropdown', name: 'PORT', options: PORT_OPTIONS },
         { type: 'field_dropdown', name: 'COLOR', options: COLOR_OPTIONS },
       ],
@@ -432,7 +484,22 @@ function defineBlocks() {
 
   P.event_when_started = b => '';
 
-  // Mouvement
+  // Movement (style app SPIKE) — appelle uniquement l'API publique motor_pair.
+  // Utilise les variables locales `_mvmt_speed` et `_mvmt_dpr_mm` injectées par finish().
+  const DIR_STEER = { FORWARD: '0', BACKWARD: '0', LEFT: '-100', RIGHT: '100' };
+  const DIR_SIGN  = { FORWARD: '',  BACKWARD: '-', LEFT: '',     RIGHT: ''   };
+  const VEL_EXPR     = '_mvmt_speed / 100 * 600';
+  const VEL_ABS_EXPR = `abs(${VEL_EXPR})`;
+
+  // Convertit (amount, unit) en degrés moteur (référence : roue gauche).
+  function amountToDegrees(amount, unit) {
+    if (unit === 'rotations') return `int((${amount}) * 360)`;
+    if (unit === 'degrees')   return `int(${amount})`;
+    if (unit === 'cm')        return `int((${amount}) * 10 / _mvmt_dpr_mm * 360)`;
+    if (unit === 'inches')    return `int((${amount}) * 25.4 / _mvmt_dpr_mm * 360)`;
+    return `int((${amount}) * 360)`;
+  }
+
   P.movement_set_motors = b =>
     `motor_pair.pair(motor_pair.PAIR_1, port.${b.getFieldValue('L')}, port.${b.getFieldValue('R')})\n`;
   P.movement_move_for_time = b =>
@@ -448,43 +515,97 @@ function defineBlocks() {
   P.movement_tank_for_degrees = b =>
     `await motor_pair.move_tank_for_degrees(motor_pair.PAIR_1, ${val(b,'D')}, ${val(b,'L')}, ${val(b,'R')})\n`;
 
-  // Moteur (style SPIKE)
+  P.movement_set_speed = b =>
+    `_mvmt_speed = ${val(b,'PCT','50')}\n`;
+
+  P.movement_set_distance_per_rotation = b => {
+    const amount = val(b, 'AMOUNT', '17.5');
+    const unit = b.getFieldValue('UNIT');
+    const mm = unit === 'cm' ? `(${amount}) * 10` : `(${amount}) * 25.4`;
+    return `_mvmt_dpr_mm = ${mm}\n`;
+  };
+
+  P.movement_move_dir_for = b => {
+    const dir = b.getFieldValue('DIR');
+    const n = val(b, 'N', '1');
+    const unit = b.getFieldValue('UNIT');
+    const steer = DIR_STEER[dir];
+    const sign = DIR_SIGN[dir];
+    const velArg = `velocity=${sign}${VEL_ABS_EXPR}`;
+    if (unit === 'seconds') {
+      return `await motor_pair.move_for_time(motor_pair.PAIR_1, int((${n}) * 1000), ${steer}, ${velArg})\n`;
+    }
+    return `await motor_pair.move_for_degrees(motor_pair.PAIR_1, ${amountToDegrees(n, unit)}, ${steer}, ${velArg})\n`;
+  };
+
+  P.movement_move_steer_for = b => {
+    const steer = val(b, 'STEER', '0');
+    const n = val(b, 'N', '1');
+    const unit = b.getFieldValue('UNIT');
+    const velArg = `velocity=${VEL_ABS_EXPR}`;
+    if (unit === 'seconds') {
+      return `await motor_pair.move_for_time(motor_pair.PAIR_1, int((${n}) * 1000), ${steer}, ${velArg})\n`;
+    }
+    return `await motor_pair.move_for_degrees(motor_pair.PAIR_1, ${amountToDegrees(n, unit)}, ${steer}, ${velArg})\n`;
+  };
+
+  P.movement_start_dir = b => {
+    const dir = b.getFieldValue('DIR');
+    return `motor_pair.move(motor_pair.PAIR_1, ${DIR_STEER[dir]}, velocity=${DIR_SIGN[dir]}${VEL_ABS_EXPR})\n`;
+  };
+
+  P.movement_start_steer = b =>
+    `motor_pair.move(motor_pair.PAIR_1, ${val(b,'STEER','0')}, velocity=${VEL_ABS_EXPR})\n`;
+
+  P.movement_stop = b =>
+    `motor_pair.stop(motor_pair.PAIR_1)\n`;
+
+  // Motor (style SPIKE) — appelle uniquement l'API publique du module motor.
+  // Utilise la variable locale `_motor_speed` injectée par finish().
+  function motorVelExpr(port) {
+    return `abs(int(_motor_speed['${port}'] / 100 * 600))`;
+  }
+
   P.spike_motor_run_for = b => {
-    const portRef = `port.${b.getFieldValue('PORT')}`;
+    const port = b.getFieldValue('PORT');
+    const portRef = `port.${port}`;
     const sign = b.getFieldValue('DIR') === 'CW' ? '' : '-';
     const n = val(b, 'N', '1');
     const unit = b.getFieldValue('UNIT');
+    const vel = motorVelExpr(port);
     if (unit === 'rotations') {
-      return `await motor.run_for_degrees(${portRef}, int(${sign}((${n})*360)), motor.get_speed_dps(${portRef}))\n`;
+      return `await motor.run_for_degrees(${portRef}, int(${sign}((${n}) * 360)), ${vel})\n`;
     }
     if (unit === 'degrees') {
-      return `await motor.run_for_degrees(${portRef}, int(${sign}(${n})), motor.get_speed_dps(${portRef}))\n`;
+      return `await motor.run_for_degrees(${portRef}, int(${sign}(${n})), ${vel})\n`;
     }
     // seconds
-    return `await motor.run_for_time(${portRef}, int((${n})*1000), ${sign}motor.get_speed_dps(${portRef}))\n`;
+    return `await motor.run_for_time(${portRef}, int((${n}) * 1000), ${sign}${vel})\n`;
   };
 
   P.spike_motor_go_to_position = b => {
-    const portRef = `port.${b.getFieldValue('PORT')}`;
+    const port = b.getFieldValue('PORT');
+    const portRef = `port.${port}`;
     const path = b.getFieldValue('PATH');
     const pos = val(b, 'POS', '0');
-    return `await motor.run_to_absolute_position(${portRef}, ${pos}, motor.get_speed_dps(${portRef}), direction=motor.${path})\n`;
+    return `await motor.run_to_absolute_position(${portRef}, ${pos}, ${motorVelExpr(port)}, direction=motor.${path})\n`;
   };
 
   P.spike_motor_start = b => {
-    const portRef = `port.${b.getFieldValue('PORT')}`;
+    const port = b.getFieldValue('PORT');
+    const portRef = `port.${port}`;
     const sign = b.getFieldValue('DIR') === 'CW' ? '' : '-';
-    return `motor.run(${portRef}, ${sign}motor.get_speed_dps(${portRef}))\n`;
+    return `motor.run(${portRef}, ${sign}${motorVelExpr(port)})\n`;
   };
 
   P.spike_motor_stop = b =>
     `motor.stop(port.${b.getFieldValue('PORT')})\n`;
 
   P.spike_motor_set_speed = b =>
-    `motor.set_speed(port.${b.getFieldValue('PORT')}, ${val(b,'PCT','75')})\n`;
+    `_motor_speed['${b.getFieldValue('PORT')}'] = ${val(b,'PCT','50')}\n`;
 
   P.spike_motor_get_speed = b =>
-    [`motor.get_speed(port.${b.getFieldValue('PORT')})`, P.ORDER_FUNCTION_CALL];
+    [`_motor_speed['${b.getFieldValue('PORT')}']`, P.ORDER_ATOMIC];
 
   P.spike_motor_position = b =>
     [`motor.absolute_position(port.${b.getFieldValue('PORT')})`, P.ORDER_FUNCTION_CALL];
@@ -561,13 +682,35 @@ export function setupBlockly(container) {
     this.definitions_['import_runloop']         = 'import runloop';
   };
 
-  // Wrap dans `async def main():` + `runloop.run(main())`
+  // Ne génère du code que pour les piles accrochées à un bloc événement
+  // (event_when_started, etc). Les blocs orphelins sont ignorés.
+  Blockly.Python.workspaceToCode = function(workspace) {
+    if (!workspace) return '';
+    this.init(workspace);
+    let code = '';
+    const topBlocks = workspace.getTopBlocks(true);
+    for (const block of topBlocks) {
+      if (!block.type.startsWith('event_')) continue;
+      if (block.disabled || (block.isEnabled && !block.isEnabled())) continue;
+      const out = this.blockToCode(block);
+      code += Array.isArray(out) ? out[0] : out;
+    }
+    return this.finish(code);
+  };
+
+  // Wrap dans `async def main():` + `runloop.run(main())`.
+  // Prélude : variables locales utilisées par les blocs Movement
+  // (vitesse par défaut + distance par tour de roue).
   const origFinish = Blockly.Python.finish;
   Blockly.Python.finish = function(code) {
     const lines = code.split('\n');
     const indented = lines.map(l => l.length ? '    ' + l : l).join('\n');
     const body = indented.trim() ? indented : '    pass';
-    const wrapped = `\nasync def main():\n${body}\n\nrunloop.run(main())\n`;
+    const prelude =
+      '    _mvmt_speed = 50\n' +
+      '    _mvmt_dpr_mm = 175.929\n' +
+      "    _motor_speed = {'A': 50, 'B': 50, 'C': 50, 'D': 50, 'E': 50, 'F': 50}\n";
+    const wrapped = `\nasync def main():\n${prelude}${body}\n\nrunloop.run(main())\n`;
     return origFinish.call(this, wrapped);
   };
 
