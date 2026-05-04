@@ -19,7 +19,7 @@ LONGEST_PATH = 1
 CLOCKWISE = 2
 COUNTERCLOCKWISE = 3
 
-_MAX_DPS = 600
+_MAX_DPS = 1100  # Vitesse max (deg/s) à 100%, conforme SPIKE App 3
 
 # Vitesse par défaut stockée par moteur (en % comme dans l'app SPIKE).
 # Utilisée par les blocs SPIKE qui ne prennent pas de vitesse explicite.

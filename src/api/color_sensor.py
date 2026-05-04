@@ -33,3 +33,13 @@ def reflection(p):
 def rgbi(p):
     """(r, g, b, i) chacun 0..1024 — non simulé fidèlement."""
     return (0, 0, 0, 0)
+
+
+def light_up_all(p, intensity=100):
+    """Allume les 3 LED autour du capteur à la même intensité (0..100 %)."""
+    _b.log(f"[color_sensor port {_to_letter(p)}] light_up_all({intensity}%)")
+
+
+def light_up(p, *intensities):
+    """Allume chaque LED à l'intensité passée (typiquement 3 valeurs 0..100)."""
+    _b.log(f"[color_sensor port {_to_letter(p)}] light_up({list(intensities)})")

@@ -4,6 +4,7 @@ import { setupBlockly } from './blockly-config.js';
 import { setupMonaco } from './monaco-config.js';
 import { runPython, stopPython } from './runner.js';
 import { parseIoFile } from '../robot/io-parser.js';
+import { HubDisplay } from '../simulator/hub-display.js';
 
 const consoleOut = document.getElementById('console-output');
 const simStatus = document.getElementById('sim-status');
@@ -119,6 +120,8 @@ log('Initialisation du simulateur...', 'info');
 // Scène 3D
 const scene = await initScene(document.getElementById('sim-canvas'));
 scene.onStartPoseChanged = saveSession;
+const hubDisplay = new HubDisplay();
+window.hubDisplay = hubDisplay;
 log('Scène 3D prête.', 'ok');
 
 // --- Sélecteurs robot / mat (alimentés par les manifestes du serveur) ---
@@ -198,6 +201,7 @@ robotSelect.addEventListener('change', () => loadRobotByFile(robotSelect.value))
 
 document.getElementById('reset-btn').onclick = () => {
   resetSimulation(scene);
+  hubDisplay.reset();
   simStatus.textContent = 'Prêt';
   log('Simulation réinitialisée.', 'info');
 };
@@ -306,7 +310,7 @@ await initSelectorsAndRestore();
 log('Chargement de Pyodide (Python dans le navigateur)...', 'info');
 let pyodide = null;
 const SPIKE3_MODULES = [
-  '_sim', 'hub', 'motor', 'motor_pair', 'color',
+  '_sim', 'hub', 'motor', 'motor_pair', 'color', 'orientation',
   'color_sensor', 'distance_sensor', 'force_sensor', 'runloop',
 ];
 const pyodideReady = (async () => {

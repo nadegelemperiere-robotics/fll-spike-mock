@@ -57,6 +57,7 @@ export async function initScene(canvas) {
     controller: null,
     sensors: null,
     dragging: false,
+    motion: { yawFace: 0, tbOffsetRad: 0 },  // miroir JS de hub.motion_sensor
   };
 
   // Resize responsive : on cadre toujours la totalité du mat (avec une marge),
@@ -80,10 +81,13 @@ export async function initScene(canvas) {
       halfW = matW / 2;
       halfH = halfW / aspect;
     }
+    // Décale verticalement le viewport pour que le mat soit en bas
+    // (laisse de la place en haut pour le hub display + readouts).
+    const verticalBias = halfH * 0.20;
     camera.left = -halfW;
     camera.right = halfW;
-    camera.top = halfH;
-    camera.bottom = -halfH;
+    camera.top = halfH + verticalBias;
+    camera.bottom = -halfH + verticalBias;
     camera.updateProjectionMatrix();
   }
   state._resize = resize;
@@ -158,10 +162,25 @@ function updateSensorReadout(state) {
     el.innerHTML = '<div class="sensor-line"><span>—</span><span class="v">aucun robot</span></div>';
     return;
   }
-  // Yaw boussole (CW positif) en degrés
-  const yawCwDeg = -state.robotState.heading * 180 / Math.PI;
+  // Calcule (yaw, pitch, roll) en degrés selon hub.motion_sensor.tilt_angles().
+  // Notre sim 2D ne fait tourner que l'axe TOP-BOTTOM ; selon yaw_face, la
+  // valeur tombe sur yaw, pitch ou roll.
+  const tbRaw = -state.robotState.heading - (state.motion?.tbOffsetRad || 0);
+  const tbDeg = Math.atan2(Math.sin(tbRaw), Math.cos(tbRaw)) * 180 / Math.PI;
+  const yawFace = state.motion?.yawFace || 0;
+  let yawDeg = 0, pitchDeg = 0, rollDeg = 0;
+  switch (yawFace) {
+    case 0: yawDeg   =  tbDeg; break; // TOP
+    case 3: yawDeg   = -tbDeg; break; // BOTTOM
+    case 1: rollDeg  =  tbDeg; break; // FRONT
+    case 4: rollDeg  = -tbDeg; break; // BACK
+    case 2: pitchDeg =  tbDeg; break; // RIGHT
+    case 5: pitchDeg = -tbDeg; break; // LEFT
+  }
   const lines = [
-    `<div class="sensor-line"><span>yaw</span><span class="v">${yawCwDeg.toFixed(1)}°</span></div>`,
+    `<div class="sensor-line"><span>yaw</span><span class="v">${yawDeg.toFixed(1)}°</span></div>`,
+    `<div class="sensor-line"><span>pitch</span><span class="v">${pitchDeg.toFixed(1)}°</span></div>`,
+    `<div class="sensor-line"><span>roll</span><span class="v">${rollDeg.toFixed(1)}°</span></div>`,
   ];
   for (const s of state.robotModel.sensors) {
     if (s.type === 'color_sensor') {
@@ -363,9 +382,8 @@ function stepKinematics(state, dt) {
   const rp = robotModel.rightPort;
   if (!lp || !rp) return;
 
-  // Vitesse % -> deg/s. À 100% le moteur SPIKE M tourne à ~1050 deg/s,
-  // on prend 600 deg/s pour rester réaliste avec la charge.
-  const DEG_PER_S_AT_100 = 600;
+  // Vitesse % -> deg/s. À 100% on tourne à 1100 deg/s (spec SPIKE App 3).
+  const DEG_PER_S_AT_100 = 1100;
   const lDegS = (robotState.motorVel[lp] / 100) * DEG_PER_S_AT_100;
   const rDegS = (robotState.motorVel[rp] / 100) * DEG_PER_S_AT_100;
 
@@ -387,6 +405,7 @@ function stepKinematics(state, dt) {
   const omega = (rVel - lVel) / robotModel.wheelbase;
 
   robotState.heading += omega * dt;
+  robotState.omega = omega;  // rad/s — vitesse angulaire instantanée
   robotState.x += v * -Math.sin(robotState.heading) * dt;
   robotState.z += v * -Math.cos(robotState.heading) * dt;
 
@@ -400,6 +419,9 @@ function makeController(state) {
     getMotorPosition(port) { return state.robotState.motorPos[port] || 0; },
     getMotorVelocity(port) { return state.robotState.motorVel[port] || 0; },
     getHeading() { return state.robotState.heading; },
+    getAngularVelocity() { return state.robotState.omega || 0; },
+    setMotionYawFace(face) { state.motion.yawFace = Number(face) || 0; },
+    setMotionTBOffset(rad) { state.motion.tbOffsetRad = Number(rad) || 0; },
     setMotorPair(leftPort, rightPort) {
       // Permet à motor_pair.pair() d'imposer les ports gauche/droit utilisés
       // par la cinématique, plutôt que ceux devinés par robot-builder.

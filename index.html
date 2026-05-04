@@ -44,16 +44,24 @@
     <div class="splitter" id="layout-splitter" title="Glisser pour redimensionner"></div>
 
     <section class="panel simulator-panel">
-      <div class="sim-header">
-        <span id="robot-name">Aucun robot</span>
-        <span class="sep">·</span>
-        <span id="mat-name">Aucun mat</span>
-        <span class="sep">·</span>
-        <span id="sim-status">Prêt</span>
-      </div>
-      <canvas id="sim-canvas"></canvas>
-      <div class="sim-overlay">
-        <div class="sensor-readout" id="sensor-readout"></div>
+      <div class="canvas-wrapper">
+        <div class="sim-header">
+          <span id="robot-name">Aucun robot</span>
+          <span class="sep">·</span>
+          <span id="mat-name">Aucun mat</span>
+          <span class="sep">·</span>
+          <span id="sim-status">Prêt</span>
+        </div>
+        <canvas id="sim-canvas"></canvas>
+        <div class="sim-overlay">
+          <div class="hub-display">
+            <div class="hub-matrix" id="hub-matrix"></div>
+            <div class="hub-power-btn" id="hub-power-btn" title="Power button (light.POWER)"></div>
+            <div class="hub-bluetooth-btn" id="hub-bluetooth-btn" title="Bluetooth Connect (light.CONNECT)"></div>
+            <div class="hub-write-text" id="hub-write-text"></div>
+          </div>
+          <div class="sensor-readout" id="sensor-readout"></div>
+        </div>
       </div>
     </section>
 

@@ -144,7 +144,15 @@ select.btn option {
 #blockly-area, #monaco-area { width: 100%; height: 100%; }
 
 /* Simulator panel */
-.simulator-panel { background: #0a0d11; position: relative; }
+.simulator-panel {
+  background: #0a0d11;
+  position: relative;
+}
+.canvas-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
 .sim-header {
   position: absolute;
   top: 12px;
@@ -167,11 +175,66 @@ select.btn option {
   display: block;
 }
 
+/* Hub display (matrice 5x5 + bouton power) — intégré dans l'overlay des capteurs */
+.hub-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(15, 20, 25, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.hub-matrix {
+  display: grid;
+  grid-template-columns: repeat(5, 8px);
+  grid-template-rows: repeat(5, 8px);
+  gap: 2px;
+  padding: 4px;
+  background: #1a1f26;
+  border-radius: 5px;
+  border: 1px solid #333a45;
+  transition: transform 0.15s ease;
+}
+.hub-matrix .pixel {
+  background: #20262e;
+  border-radius: 2px;
+  transition: background 0.08s;
+}
+.hub-power-btn,
+.hub-bluetooth-btn {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #20262e;
+  border: 2px solid #333a45;
+  box-shadow: inset 0 0 3px rgba(0,0,0,0.4);
+  transition: background 0.1s, box-shadow 0.1s;
+  flex-shrink: 0;
+}
+.hub-bluetooth-btn {
+  /* Plus petit, anneau de LED autour du bouton bluetooth */
+  border-color: #1e90ff44;
+}
+.hub-write-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
+}
+
 .sim-overlay {
   position: absolute;
   top: 12px;
   right: 12px;
   z-index: 5;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
 }
 .sensor-readout {
   background: rgba(15, 20, 25, 0.85);
