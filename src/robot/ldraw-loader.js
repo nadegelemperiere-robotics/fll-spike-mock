@@ -13,6 +13,17 @@ import { classifyPart } from './part-ids.js';
 
 const LDU_TO_MM = 0.4;
 
+function frontAxisToRotation(front) {
+  const f = (front || '-z').toLowerCase();
+  switch (f) {
+    case '-z': return 0;
+    case '+z': return Math.PI;
+    case '+x': return Math.PI / 2;
+    case '-x': return -Math.PI / 2;
+    default: return 0;
+  }
+}
+
 const PLACEHOLDER_COLORS = {
   hub: 0xffd166,
   motor: 0x4a4a4a,
@@ -35,14 +46,19 @@ const PLACEHOLDER_SIZES_MM = {
 /**
  * Parse un texte LDraw / MPD et retourne :
  *   { group: THREE.Group, components: [{type, port?, position, rotation, partId}, ...] }
+ *
+ * `config.front` ('+x'|'-x'|'+z'|'-z') indique l'axe LDraw qui correspond à
+ * l'avant du robot ; les positions sont pivotées pour que toute la suite du
+ * pipeline travaille dans le repère canonique (avant = -Z, latéral = X).
  */
-export async function loadLdrawModel(ldrText) {
+export async function loadLdrawModel(ldrText, config = {}) {
   const files = parseMpdFiles(ldrText);
   const main = files.find(f => f.name === '__root__') || files[0];
 
   const components = [];
+  const unclassified = new Set();
   const identity = new THREE.Matrix4();
-  expandFile(files, main, identity, components);
+  expandFile(files, main, identity, components, unclassified);
 
   // Auto-assigner les ports A-F aux moteurs et capteurs dans l'ordre où
   // ils apparaissent (ordre de parsing).
@@ -54,18 +70,45 @@ export async function loadLdrawModel(ldrText) {
     }
   }
 
+  // Recentrer toutes les pièces sur le hub : sa position devient (0,0,0) dans
+  // le repère du robot. Comme ça, faire pivoter le groupe autour de son origine
+  // fait pivoter le robot autour de son hub (et pas autour de l'origine LDR).
+  const hub = components.find(c => c.type === 'hub');
+  if (hub) {
+    const [hx, hy, hz] = hub.position;
+    for (const c of components) {
+      c.position = [c.position[0] - hx, c.position[1] - hy, c.position[2] - hz];
+    }
+  }
+
+  // Appliquer la rotation `front` aux positions pour passer en repère canonique
+  // (front = -Z, latéral = X). Comme ça, robot-builder peut trier sur X pour
+  // identifier gauche/droite, et la cinématique différentielle marche directement.
+  const frontAngle = frontAxisToRotation(config.front);
+  if (frontAngle !== 0) {
+    const cos = Math.cos(frontAngle);
+    const sin = Math.sin(frontAngle);
+    for (const c of components) {
+      const [x, y, z] = c.position;
+      c.position = [cos * x + sin * z, y, -sin * x + cos * z];
+    }
+  }
+
   // Construire un groupe 3D simple avec des boîtes colorées
   const group = buildPlaceholderGroup(components);
 
-  // Aide au debug si rien n'a été détecté
+  // Diagnostic systématique
   if (typeof window !== 'undefined' && window.simLog) {
-    if (components.length === 0) {
-      const sample = collectAllPartIds(files).slice(0, 20).join(', ');
+    const counts = { hub: 0, motor: 0, color_sensor: 0, distance_sensor: 0, force_sensor: 0, wheel: 0 };
+    for (const c of components) counts[c.type] = (counts[c.type] || 0) + 1;
+    const summary = Object.entries(counts).filter(([, n]) => n > 0).map(([k, n]) => `${k}=${n}`).join(', ');
+    window.simLog(`Pièces SPIKE détectées : ${summary || '(aucune)'}.`, 'info');
+    if (unclassified.size > 0) {
+      const sample = [...unclassified].slice(0, 30).join(', ');
       window.simLog(
-        `Aucun composant SPIKE reconnu. Pièces vues : ${sample || '(aucune)'}`,
+        `Pièces non classées (${unclassified.size}) : ${sample}${unclassified.size > 30 ? '…' : ''}`,
         'info'
       );
-      window.simLog('Ajoute les IDs du Hub/moteurs/capteurs dans src/robot/part-ids.js', 'info');
     }
   }
 
@@ -100,17 +143,22 @@ function parseMpdFiles(text) {
     current.lines.push(line);
   }
 
-  // Si des FILE markers existent, le premier "main" est le sous-modèle racine
+  // Si des FILE markers existent, le premier sous-modèle nommé devient la racine.
+  // L'éventuel `__root__` initial (lignes avant la première directive FILE)
+  // n'est utilisé que comme commentaires de tête : on le jette.
   if (sawFileMarker) {
-    const root = files.find(f => f.name !== '__root__' && f.name !== '__orphan__');
-    if (root) root.name = '__root__';
-    return files.filter(f => f.name !== '__orphan__');
+    const initialRoot = files[0];
+    const namedFiles = files.filter(f => f !== initialRoot && f.name !== '__orphan__');
+    if (namedFiles.length > 0) {
+      namedFiles[0].name = '__root__';
+      return namedFiles;
+    }
   }
-  return files;
+  return files.filter(f => f.name !== '__orphan__');
 }
 
 
-function expandFile(files, file, parentMatrix, components) {
+function expandFile(files, file, parentMatrix, components, unclassified) {
   for (const line of file.lines) {
     const trimmed = line.trim();
     if (!trimmed.startsWith('1 ')) continue;
@@ -137,14 +185,8 @@ function expandFile(files, file, parentMatrix, components) {
     );
     const worldM = parentMatrix.clone().multiply(localM);
 
-    // Référence à un sous-modèle MPD ?
-    const sub = files.find(s => s.name === partName);
-    if (sub) {
-      expandFile(files, sub, worldM, components);
-      continue;
-    }
-
-    // Pièce SPIKE connue ?
+    // Pièce SPIKE connue (priorité sur les sous-modèles, au cas où un sous-modèle
+    // porte le même nom qu'une pièce officielle) ?
     const cls = classifyPart(partName);
     if (cls) {
       const pos = new THREE.Vector3();
@@ -159,7 +201,18 @@ function expandFile(files, file, parentMatrix, components) {
         rotation: quat.toArray(),
         meta: cls,
       });
+      continue;
     }
+
+    // Sinon référence à un sous-modèle MPD ?
+    const sub = files.find(s => s.name === partName);
+    if (sub) {
+      expandFile(files, sub, worldM, components, unclassified);
+      continue;
+    }
+
+    // Pièce inconnue : on l'enregistre pour le diagnostic
+    if (unclassified) unclassified.add(partName);
   }
 }
 

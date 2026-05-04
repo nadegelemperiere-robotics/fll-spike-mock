@@ -22,6 +22,44 @@ window.simLog = log;
 
 document.getElementById('clear-console').onclick = () => (consoleOut.innerHTML = '');
 
+// --- Splitter draggable entre éditeur et simulateur/console ---
+(function setupSplitter() {
+  const splitter = document.getElementById('layout-splitter');
+  const layout = document.querySelector('.layout');
+  if (!splitter || !layout) return;
+
+  let dragging = false;
+  const MIN = 280;  // largeur min de l'éditeur
+  const RIGHT_MIN = 280;  // largeur min côté sim/console
+
+  splitter.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    splitter.classList.add('dragging');
+    splitter.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+
+  splitter.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const rect = layout.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const clamped = Math.max(MIN, Math.min(rect.width - RIGHT_MIN, x));
+    layout.style.setProperty('--editor-width', `${clamped}px`);
+    // Forcer re-layout Blockly (Monaco s'adapte tout seul via automaticLayout)
+    if (typeof Blockly !== 'undefined' && typeof blocklyWorkspace !== 'undefined' && blocklyWorkspace) {
+      Blockly.svgResize(blocklyWorkspace);
+    }
+  });
+
+  splitter.addEventListener('pointerup', (e) => {
+    if (!dragging) return;
+    dragging = false;
+    splitter.classList.remove('dragging');
+    splitter.releasePointerCapture(e.pointerId);
+    saveSession();
+  });
+})();
+
 // --- Persistance localStorage ---
 const STORAGE_KEY = 'spike-mock:v2';  // v2: stocke des noms de fichiers, pas les configs complètes
 let selectedMatFile = null;
@@ -38,6 +76,7 @@ function saveSessionDebounced() {
 function saveSession() {
   saveTimer = null;
   try {
+    const layout = document.querySelector('.layout');
     const data = {
       code: typeof monaco !== 'undefined' && monaco?.getValue ? monaco.getValue() : null,
       blocks: (typeof blocklyWorkspace !== 'undefined' && blocklyWorkspace && typeof Blockly !== 'undefined')
@@ -46,6 +85,7 @@ function saveSession() {
       matFile: selectedMatFile,
       robotFile: selectedRobotFile,
       startPose: scene?.startPose || null,
+      editorWidth: layout?.style.getPropertyValue('--editor-width') || null,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (e) {
@@ -166,13 +206,31 @@ document.getElementById('reset-btn').onclick = () => {
 const blocklyWorkspace = setupBlockly(document.getElementById('blockly-area'));
 const monaco = await setupMonaco(document.getElementById('monaco-area'));
 
-function syncBlocksToPython() {
+// Affichage du Python généré dans l'onglet Python.
+// Mettre à false pour cacher le code généré (l'onglet Python devient un éditeur indépendant).
+const SHOW_GENERATED_PYTHON = true;
+
+function generatePythonFromBlocks() {
   try {
-    const code = Blockly.Python.workspaceToCode(blocklyWorkspace);
-    monaco.setValue(code);
+    return Blockly.Python.workspaceToCode(blocklyWorkspace);
   } catch (e) {
     console.warn('Conversion blocs->python:', e);
+    return '';
   }
+}
+
+function syncBlocksToPython() {
+  if (!SHOW_GENERATED_PYTHON) return;
+  monaco.setValue(generatePythonFromBlocks());
+}
+
+// Source active : blocs (régénérée à la volée) ou Python (Monaco)
+function getActiveCode() {
+  const blocksTab = document.querySelector('.tab[data-tab="blocks"]');
+  if (blocksTab?.classList.contains('active')) {
+    return generatePythonFromBlocks();
+  }
+  return monaco.getValue();
 }
 
 // Sauvegarde sur changement éditeur (debounced)
@@ -190,6 +248,12 @@ async function initSelectorsAndRestore() {
   restoring = true;
   try {
     const data = readSession() || {};
+
+    // 0) Restaurer la largeur de l'éditeur
+    if (data.editorWidth) {
+      const layout = document.querySelector('.layout');
+      if (layout) layout.style.setProperty('--editor-width', data.editorWidth);
+    }
 
     // 1) Restaurer code / blocs immédiatement (ne dépend pas du réseau)
     if (data.code) {
@@ -273,7 +337,7 @@ document.getElementById('run-btn').onclick = async () => {
     await pyodideReady;
     if (!pyodide) { log('Pyodide indisponible.', 'err'); return; }
   }
-  const code = monaco.getValue();
+  const code = getActiveCode();
   if (!code.trim()) { log('Code vide.', 'err'); return; }
   simStatus.textContent = 'En cours...';
   try {
@@ -287,6 +351,11 @@ document.getElementById('run-btn').onclick = async () => {
 
 document.getElementById('stop-btn').onclick = () => {
   stopPython();
+  // Force l'arrêt des moteurs même si plus aucun Python ne tourne
+  // (cas typique : motor.run() lancé puis main() terminé).
+  for (const port of ['A', 'B', 'C', 'D', 'E', 'F']) {
+    scene.controller.stopMotor(port);
+  }
   simStatus.textContent = 'Arrêté';
 };
 

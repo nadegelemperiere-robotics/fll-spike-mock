@@ -105,37 +105,59 @@ async function inflateRaw(buf) {
   return new Uint8Array(await stream.arrayBuffer());
 }
 
+async function extractLdrText(buf, entry) {
+  let raw = getLocalFileData(buf, entry);
+  if (entry.flag & 0x1) {
+    const cipher = new ZipCrypto(PASSWORD);
+    const decrypted = cipher.decrypt(raw);
+    raw = decrypted.slice(12);
+  }
+  let plain;
+  if (entry.method === 0) {
+    plain = raw;
+  } else if (entry.method === 8) {
+    plain = await inflateRaw(raw);
+  } else {
+    throw new Error('Méthode de compression non supportée: ' + entry.method);
+  }
+  return new TextDecoder('utf-8').decode(plain);
+}
+
+function isMpd(text) {
+  return /^0\s+FILE\s+/im.test(text);
+}
+
 /**
- * Lit un File .io et retourne le contenu de model.ldr (texte LDraw).
+ * Lit un File .io et retourne un texte MPD contenant tous les .ldr de l'archive
+ * (le premier étant le modèle principal, les autres devenant sous-modèles
+ * référençables par leur nom de fichier).
  */
 export async function parseIoFile(file) {
   const buf = await file.arrayBuffer();
   const entries = await readZipEntries(buf);
 
-  // On cherche model.ldr (parfois dans un sous-dossier)
-  const target = entries.find(e => e.name.toLowerCase().endsWith('model.ldr'))
-              || entries.find(e => e.name.toLowerCase().endsWith('.ldr'));
-  if (!target) throw new Error('Aucun fichier .ldr trouvé dans l\'archive .io');
+  const ldrEntries = entries.filter(e => e.name.toLowerCase().endsWith('.ldr'));
+  if (ldrEntries.length === 0) throw new Error('Aucun fichier .ldr trouvé dans l\'archive .io');
 
-  let raw = getLocalFileData(buf, target);
+  // Mettre model.ldr en premier si présent (= modèle principal)
+  const sorted = [
+    ...ldrEntries.filter(e => /(?:^|\/)model\.ldr$/i.test(e.name)),
+    ...ldrEntries.filter(e => !/(?:^|\/)model\.ldr$/i.test(e.name)),
+  ];
 
-  // Si chiffré, déchiffrer (les 12 premiers octets sont le header de validation)
-  if (target.flag & 0x1) {
-    const cipher = new ZipCrypto(PASSWORD);
-    const decrypted = cipher.decrypt(raw);
-    // Vérification : le 12e octet doit correspondre au CRC ou au timestamp
-    raw = decrypted.slice(12);
+  const parts = [];
+  for (let idx = 0; idx < sorted.length; idx++) {
+    const entry = sorted[idx];
+    const text = await extractLdrText(buf, entry);
+    const filename = entry.name.split('/').pop().toLowerCase();
+
+    if (idx === 0 && isMpd(text)) {
+      // Modèle principal déjà en MPD : on le prend tel quel.
+      parts.push(text);
+    } else {
+      // On enveloppe avec un marqueur 0 FILE pour pouvoir le référencer.
+      parts.push(`0 FILE ${filename}\n${text}`);
+    }
   }
-
-  // Décompression
-  let plain;
-  if (target.method === 0) {
-    plain = raw;
-  } else if (target.method === 8) {
-    plain = await inflateRaw(raw);
-  } else {
-    throw new Error('Méthode de compression non supportée: ' + target.method);
-  }
-
-  return new TextDecoder('utf-8').decode(plain);
+  return parts.join('\n');
 }
