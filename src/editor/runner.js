@@ -24,6 +24,7 @@ export async function runPython(pyodide, code, scene, log) {
     getMotorPosition: (port) => scene.controller.getMotorPosition(port),
     getMotorVelocity: (port) => scene.controller.getMotorVelocity(port),
     getHeading: () => scene.controller.getHeading(),
+    setMotorPair: (left, right) => scene.controller.setMotorPair(left, right),
     getColor: (port) => scene.controller.readColorSensor(port),
     getReflectedLight: (port) => scene.controller.readReflectedLight(port),
     getDistance: (port) => scene.controller.readDistanceSensor(port),
@@ -43,9 +44,6 @@ export async function runPython(pyodide, code, scene, log) {
     // Reset des états Python qui persistent entre runs (modules cachés par Pyodide).
     await pyodide.runPythonAsync(`
 import sys
-_m = sys.modules.get('motor')
-if _m is not None:
-    _m._default_pct.clear()
 _mp = sys.modules.get('motor_pair')
 if _mp is not None:
     _mp._pairs.clear()
