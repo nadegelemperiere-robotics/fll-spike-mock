@@ -10,7 +10,10 @@ const C = {
   sound:     '#b466e9',
   sensors:   '#5CB1D6',
   control:   '#f4b844',
-  operators: '#59C059',
+  operators: '#53b65a',  // Vert SPIKE Operators
+  myblocks:  '#ed7082',  // Rose foncé style SPIKE My Blocks
+  vars:      '#f19d4c',  // Orange clair SPIKE Variables
+  lists:     '#ed724a',  // Orange foncé SPIKE Lists
 };
 
 // Petite icône moteur SPIKE (roue avec 4 plots) — affichée à gauche de chaque bloc Motor.
@@ -170,7 +173,7 @@ const IMAGE_OPTIONS = [
 
 // Helper : crée un bloc de toolbox avec des shadow blocks pour ses entrées numériques/texte.
 // num(spec) où spec est un nombre crée un math_number shadow. Une chaîne crée un text shadow.
-function tb(type, shadows = {}) {
+function tb(type, shadows = {}, fields = null) {
   const inputs = {};
   for (const [name, value] of Object.entries(shadows)) {
     if (typeof value === 'number') {
@@ -179,7 +182,10 @@ function tb(type, shadows = {}) {
       inputs[name] = { shadow: { type: 'text', fields: { TEXT: value } } };
     }
   }
-  return Object.keys(inputs).length ? { kind: 'block', type, inputs } : { kind: 'block', type };
+  const out = { kind: 'block', type };
+  if (fields) out.fields = fields;
+  if (Object.keys(inputs).length) out.inputs = inputs;
+  return out;
 }
 
 const TOOLBOX = {
@@ -252,29 +258,49 @@ const TOOLBOX = {
       kind: 'category', name: 'Sensors', colour: C.sensors, contents: [
         tb('sensor_is_color'),
         tb('sensor_color'),
-        tb('sensor_reflection'),
-        tb('sensor_distance_mm'),
-        tb('sensor_force_pressed'),
-        tb('sensor_force'),
-        tb('sensor_yaw'),
-        tb('sensor_reset_yaw', { A: 0 }),
+        tb('sensor_reflection_compare', { N: 50 }),
+        tb('sensor_reflected_light'),
+        tb('sensor_timer'),
+        tb('sensor_reset_timer'),
+        tb('sensor_set_yaw_zero'),
+        tb('sensor_tilt_angle'),
+        tb('sensor_button_pressed'),
       ]
     },
     {
       kind: 'category', name: 'Operators', colour: C.operators, contents: [
-        tb('math_number'),
-        tb('math_arithmetic'),
-        tb('math_single'),
-        tb('math_modulo'),
-        tb('logic_compare'),
-        tb('logic_operation'),
+        // Comparaisons
+        tb('logic_compare', { A: 0, B: 100 }, { OP: 'GT' }),
+        tb('logic_compare', { A: 0, B: 100 }, { OP: 'EQ' }),
+        tb('logic_compare', { A: 0, B: 100 }, { OP: 'LT' }),
+        // Logique
+        tb('logic_operation', {}, { OP: 'AND' }),
+        tb('logic_operation', {}, { OP: 'OR' }),
         tb('logic_negate'),
-        tb('logic_boolean'),
+        // Plage
+        tb('op_in_between', { VAL: 0, LO: -10, HI: 10 }),
+        // Arithmétique
+        tb('math_arithmetic', { A: 0, B: 0 }, { OP: 'ADD' }),
+        tb('math_arithmetic', { A: 0, B: 0 }, { OP: 'MINUS' }),
+        tb('math_arithmetic', { A: 0, B: 0 }, { OP: 'MULTIPLY' }),
+        tb('math_arithmetic', { A: 0, B: 0 }, { OP: 'DIVIDE' }),
+        tb('math_modulo',   { DIVIDEND: 0, DIVISOR: 0 }),
+        tb('math_random_int', { FROM: 1, TO: 10 }),
+        tb('math_round'),
+        tb('math_single'),
+        // Texte
+        tb('text_join'),
+        tb('text_charAt', { VALUE: 'apple' }),
+        tb('text_length', { VALUE: 'apple' }),
+        tb('op_text_contains', { TEXT: 'apple', SUB: 'a' }),
+        // Littéraux
+        tb('math_number'),
         tb('text'),
+        tb('logic_boolean'),
       ]
     },
-    { kind: 'category', name: 'Variables', colour: '#FF8C1A', custom: 'VARIABLE' },
-    { kind: 'category', name: 'My Blocks', colour: '#FF6680', custom: 'PROCEDURE' },
+    { kind: 'category', name: 'Variables', colour: C.vars, custom: 'VARIABLE_AND_LIST' },
+    { kind: 'category', name: 'My Blocks', colour: C.myblocks, custom: 'PROCEDURE' },
   ]
 };
 
@@ -286,7 +312,7 @@ function wrapEventCoro(P, block, funcName, body) {
   const indent = (s, n) => s.split('\n').map(l => l ? ' '.repeat(n) + l : l).join('\n');
   const trimmed = body.replace(/\s+$/, '');
   const safeBody = trimmed || 'pass';
-  const globalsLine = '    global _mvmt_speed, _mvmt_dpr_mm, _motor_speed';
+  const globalsLine = '    global _mvmt_speed, _mvmt_dpr_mm, _motor_speed, _program_start_t';
 
   switch (block.type) {
     case 'event_when_started':
@@ -772,55 +798,86 @@ function defineBlocks() {
     // === Sensors ===
     {
       type: 'sensor_is_color',
-      message0: 'is color on port %1 %2 ?',
+      message0: '%1 %2 is color %3 ?',
       args0: [
-        MOTOR_ICON,
+        COLOR_EVT_ICON,
         { type: 'field_dropdown', name: 'PORT', options: PORT_OPTIONS },
         { type: 'field_dropdown', name: 'COLOR', options: COLOR_OPTIONS },
       ],
       output: 'Boolean', colour: C.sensors,
+      inputsInline: true,
     },
     {
       type: 'sensor_color',
-      message0: 'color on port %1',
-      args0: [{ type: 'field_dropdown', name: 'PORT', options: PORT_OPTIONS }],
+      message0: '%1 %2 color',
+      args0: [
+        COLOR_EVT_ICON,
+        { type: 'field_dropdown', name: 'PORT', options: PORT_OPTIONS },
+      ],
       output: 'Number', colour: C.sensors,
+      inputsInline: true,
     },
     {
-      type: 'sensor_reflection',
-      message0: 'reflected light port %1 (%%)',
-      args0: [{ type: 'field_dropdown', name: 'PORT', options: PORT_OPTIONS }],
-      output: 'Number', colour: C.sensors,
-    },
-    {
-      type: 'sensor_distance_mm',
-      message0: 'distance port %1 (mm)',
-      args0: [{ type: 'field_dropdown', name: 'PORT', options: PORT_OPTIONS }],
-      output: 'Number', colour: C.sensors,
-    },
-    {
-      type: 'sensor_force_pressed',
-      message0: 'is force port %1 pressed ?',
-      args0: [{ type: 'field_dropdown', name: 'PORT', options: PORT_OPTIONS }],
+      type: 'sensor_reflection_compare',
+      message0: '%1 %2 reflection %3 %4 %% ?',
+      args0: [
+        COLOR_EVT_ICON,
+        { type: 'field_dropdown', name: 'PORT', options: PORT_OPTIONS },
+        { type: 'field_dropdown', name: 'OP', options: [['<','LT'], ['=','EQ'], ['>','GT']] },
+        { type: 'input_value', name: 'N', check: 'Number' },
+      ],
       output: 'Boolean', colour: C.sensors,
+      inputsInline: true,
     },
     {
-      type: 'sensor_force',
-      message0: 'force port %1 (deci-N)',
-      args0: [{ type: 'field_dropdown', name: 'PORT', options: PORT_OPTIONS }],
+      type: 'sensor_reflected_light',
+      message0: '%1 %2 reflected light',
+      args0: [
+        COLOR_EVT_ICON,
+        { type: 'field_dropdown', name: 'PORT', options: PORT_OPTIONS },
+      ],
       output: 'Number', colour: C.sensors,
+      inputsInline: true,
     },
     {
-      type: 'sensor_yaw',
-      message0: 'yaw angle (°)',
+      type: 'sensor_timer',
+      message0: 'timer',
       output: 'Number', colour: C.sensors,
-      tooltip: 'Current yaw in degrees (positive = clockwise from above).',
+      tooltip: 'Seconds elapsed since program start or last reset.',
     },
     {
-      type: 'sensor_reset_yaw',
-      message0: 'set yaw angle to %1 °',
-      args0: [{ type: 'input_value', name: 'A', check: 'Number' }],
+      type: 'sensor_reset_timer',
+      message0: 'reset timer',
       previousStatement: null, nextStatement: null, colour: C.sensors,
+    },
+    {
+      type: 'sensor_set_yaw_zero',
+      message0: '%1 set yaw angle to 0',
+      args0: [HUB_MATRIX_ICON],
+      previousStatement: null, nextStatement: null, colour: C.sensors,
+      inputsInline: true,
+    },
+    {
+      type: 'sensor_tilt_angle',
+      message0: '%1 %2 angle',
+      args0: [
+        HUB_MATRIX_ICON,
+        { type: 'field_dropdown', name: 'AXIS', options: [['yaw','YAW'], ['pitch','PITCH'], ['roll','ROLL']] },
+      ],
+      output: 'Number', colour: C.sensors,
+      inputsInline: true,
+      tooltip: 'Tilt angle in degrees (yaw / pitch / roll).',
+    },
+    {
+      type: 'sensor_button_pressed',
+      message0: '%1 is %2 button %3 ?',
+      args0: [
+        HUB_MATRIX_ICON,
+        { type: 'field_dropdown', name: 'BTN',   options: [['left','LEFT'], ['right','RIGHT']] },
+        { type: 'field_dropdown', name: 'STATE', options: [['pressed','PRESSED'], ['released','RELEASED']] },
+      ],
+      output: 'Boolean', colour: C.sensors,
+      inputsInline: true,
     },
 
     // === Control ===
@@ -903,12 +960,127 @@ function defineBlocks() {
       ],
       previousStatement: null, colour: C.control,  // terminal : pas de nextStatement
     },
+
+    // === Lists (style SPIKE, basé sur des variables typées 'List') ===
+    {
+      type: 'data_addtolist',
+      message0: 'add %1 to %2',
+      args0: [
+        { type: 'input_value', name: 'VALUE' },
+        { type: 'field_variable', name: 'LIST', variableTypes: ['List'], defaultType: 'List' },
+      ],
+      previousStatement: null, nextStatement: null, colour: C.lists,
+      inputsInline: true,
+    },
+    {
+      type: 'data_deleteoflist',
+      message0: 'delete %1 of %2',
+      args0: [
+        { type: 'input_value', name: 'INDEX', check: 'Number' },
+        { type: 'field_variable', name: 'LIST', variableTypes: ['List'], defaultType: 'List' },
+      ],
+      previousStatement: null, nextStatement: null, colour: C.lists,
+      inputsInline: true,
+    },
+    {
+      type: 'data_deletealloflist',
+      message0: 'delete all of %1',
+      args0: [
+        { type: 'field_variable', name: 'LIST', variableTypes: ['List'], defaultType: 'List' },
+      ],
+      previousStatement: null, nextStatement: null, colour: C.lists,
+      inputsInline: true,
+    },
+    {
+      type: 'data_insertatlist',
+      message0: 'insert %1 at %2 of %3',
+      args0: [
+        { type: 'input_value', name: 'VALUE' },
+        { type: 'input_value', name: 'INDEX', check: 'Number' },
+        { type: 'field_variable', name: 'LIST', variableTypes: ['List'], defaultType: 'List' },
+      ],
+      previousStatement: null, nextStatement: null, colour: C.lists,
+      inputsInline: true,
+    },
+    {
+      type: 'data_replaceitemoflist',
+      message0: 'replace item %1 of %2 with %3',
+      args0: [
+        { type: 'input_value', name: 'INDEX', check: 'Number' },
+        { type: 'field_variable', name: 'LIST', variableTypes: ['List'], defaultType: 'List' },
+        { type: 'input_value', name: 'VALUE' },
+      ],
+      previousStatement: null, nextStatement: null, colour: C.lists,
+      inputsInline: true,
+    },
+    {
+      type: 'data_itemoflist',
+      message0: 'item %1 of %2',
+      args0: [
+        { type: 'input_value', name: 'INDEX', check: 'Number' },
+        { type: 'field_variable', name: 'LIST', variableTypes: ['List'], defaultType: 'List' },
+      ],
+      output: null, colour: C.lists,
+      inputsInline: true,
+    },
+    {
+      type: 'data_itemnumoflist',
+      message0: 'item # of %1 in %2',
+      args0: [
+        { type: 'input_value', name: 'VALUE' },
+        { type: 'field_variable', name: 'LIST', variableTypes: ['List'], defaultType: 'List' },
+      ],
+      output: 'Number', colour: C.lists,
+      inputsInline: true,
+    },
+    {
+      type: 'data_lengthoflist',
+      message0: 'length of %1',
+      args0: [
+        { type: 'field_variable', name: 'LIST', variableTypes: ['List'], defaultType: 'List' },
+      ],
+      output: 'Number', colour: C.lists,
+      inputsInline: true,
+    },
+    {
+      type: 'data_listcontainsitem',
+      message0: '%1 contains %2 ?',
+      args0: [
+        { type: 'field_variable', name: 'LIST', variableTypes: ['List'], defaultType: 'List' },
+        { type: 'input_value', name: 'VALUE' },
+      ],
+      output: 'Boolean', colour: C.lists,
+      inputsInline: true,
+    },
+
+    // === Operators (custom : pas dans le stock Blockly) ===
+    {
+      type: 'op_in_between',
+      message0: 'is %1 in between %2 and %3 ?',
+      args0: [
+        { type: 'input_value', name: 'VAL', check: 'Number' },
+        { type: 'input_value', name: 'LO',  check: 'Number' },
+        { type: 'input_value', name: 'HI',  check: 'Number' },
+      ],
+      output: 'Boolean', colour: C.operators,
+      inputsInline: true,
+    },
+    {
+      type: 'op_text_contains',
+      message0: '%1 contains %2 ?',
+      args0: [
+        { type: 'input_value', name: 'TEXT' },
+        { type: 'input_value', name: 'SUB' },
+      ],
+      output: 'Boolean', colour: C.operators,
+      inputsInline: true,
+    },
   ]);
 
   // ---------------- Générateurs Python ----------------
   const P = Blockly.Python;
   const val = (b, n, def='0') => P.valueToCode(b, n, P.ORDER_ATOMIC) || def;
-  const stmt = (b, n) => P.statementToCode(b, n) || '    pass\n';
+  const stmt = (b, n) => P.statementToCode(b, n) || (P.INDENT + 'pass\n');
 
   P.event_when_started = b => '';
 
@@ -998,7 +1170,9 @@ function defineBlocks() {
   P.spike_motor_run_for = b => {
     const port = b.getFieldValue('PORT');
     const portRef = `port.${port}`;
-    const sign = b.getFieldValue('DIR') === 'CW' ? '' : '-';
+    // CW = sens horaire vu de l'arrière de la roue → sens "marche arrière"
+    // côté simulateur (la cinématique applique le miroir physique du moteur).
+    const sign = b.getFieldValue('DIR') === 'CW' ? '-' : '';
     const n = val(b, 'N', '1');
     const unit = b.getFieldValue('UNIT');
     const vel = motorVelExpr(port);
@@ -1023,7 +1197,7 @@ function defineBlocks() {
   P.spike_motor_start = b => {
     const port = b.getFieldValue('PORT');
     const portRef = `port.${port}`;
-    const sign = b.getFieldValue('DIR') === 'CW' ? '' : '-';
+    const sign = b.getFieldValue('DIR') === 'CW' ? '-' : '';
     return `motor.run(${portRef}, ${sign}${motorVelExpr(port)})\n`;
   };
 
@@ -1084,23 +1258,46 @@ function defineBlocks() {
   P.sound_beep = b =>
     `sound.beep(${val(b,'F','440')}, ${val(b,'D','200')})\n`;
 
-  // Capteurs
+  // Capteurs (API SPIKE pure : color_sensor / motion_sensor / button + time module).
   P.sensor_is_color = b =>
     [`color_sensor.color(port.${b.getFieldValue('PORT')}) == color.${b.getFieldValue('COLOR')}`, P.ORDER_RELATIONAL];
+
   P.sensor_color = b =>
     [`color_sensor.color(port.${b.getFieldValue('PORT')})`, P.ORDER_FUNCTION_CALL];
-  P.sensor_reflection = b =>
+
+  P.sensor_reflection_compare = b => {
+    const op = { LT: '<', EQ: '==', GT: '>' }[b.getFieldValue('OP')] || '<';
+    const n = val(b, 'N', '50');
+    return [`color_sensor.reflection(port.${b.getFieldValue('PORT')}) ${op} ${n}`, P.ORDER_RELATIONAL];
+  };
+
+  P.sensor_reflected_light = b =>
     [`color_sensor.reflection(port.${b.getFieldValue('PORT')})`, P.ORDER_FUNCTION_CALL];
-  P.sensor_distance_mm = b =>
-    [`distance_sensor.distance(port.${b.getFieldValue('PORT')})`, P.ORDER_FUNCTION_CALL];
-  P.sensor_force_pressed = b =>
-    [`force_sensor.pressed(port.${b.getFieldValue('PORT')})`, P.ORDER_FUNCTION_CALL];
-  P.sensor_force = b =>
-    [`force_sensor.force(port.${b.getFieldValue('PORT')})`, P.ORDER_FUNCTION_CALL];
-  P.sensor_yaw = b =>
-    [`(motion_sensor.tilt_angles()[0] / 10)`, P.ORDER_MULTIPLICATIVE];
-  P.sensor_reset_yaw = b =>
-    `motion_sensor.reset_yaw(${val(b,'A','0')})\n`;
+
+  // Timer : on s'appuie sur _time.monotonic() + _program_start_t déjà déclarés
+  // dans definitions_['_state_vars'] (Python time module, pas l'API SPIKE).
+  P.sensor_timer = b =>
+    [`(_time.monotonic() - _program_start_t)`, P.ORDER_ADDITIVE];
+
+  P.sensor_reset_timer = b =>
+    `_program_start_t = _time.monotonic()\n`;
+
+  P.sensor_set_yaw_zero = b =>
+    `motion_sensor.reset_yaw(0)\n`;
+
+  P.sensor_tilt_angle = b => {
+    // tilt_angles() retourne (yaw, pitch, roll) en déci-degrés (SPIKE 3 :
+    // 900 = 90°). Côté blocs on travaille en degrés, donc on divise par 10.
+    const idx = { YAW: 0, PITCH: 1, ROLL: 2 }[b.getFieldValue('AXIS')] || 0;
+    return [`(motion_sensor.tilt_angles()[${idx}] / 10)`, P.ORDER_MULTIPLICATIVE];
+  };
+
+  P.sensor_button_pressed = b => {
+    const btn = b.getFieldValue('BTN');           // LEFT / RIGHT
+    const state = b.getFieldValue('STATE');       // PRESSED / RELEASED
+    const op = state === 'PRESSED' ? '>' : '==';
+    return [`button.pressed(button.${btn}) ${op} 0`, P.ORDER_RELATIONAL];
+  };
 
   // Contrôle
   P.control_wait_seconds = b =>
@@ -1114,13 +1311,13 @@ function defineBlocks() {
   P.control_repeat = b => {
     const times = val(b, 'TIMES', '10');
     const body = stmt(b, 'BODY');
-    return `for _ in range(int(${times})):\n${body}    await runloop.sleep_ms(0)\n`;
+    return `for _ in range(int(${times})):\n${body}`;
   };
 
   P.control_repeat_until = b => {
     const cond = P.valueToCode(b, 'COND', P.ORDER_NONE) || 'False';
     const body = stmt(b, 'BODY');
-    return `while not (${cond}):\n${body}    await runloop.sleep_ms(10)\n`;
+    return `while not (${cond}):\n${body}`;
   };
 
   P.control_if = b => {
@@ -1137,13 +1334,80 @@ function defineBlocks() {
   };
 
   P.control_forever = b =>
-    `while True:\n${stmt(b,'BODY')}    await runloop.sleep_ms(10)\n`;
+    `while True:\n${stmt(b,'BODY')}`;
 
   P.control_stop_other_stacks = b =>
     `import asyncio as _asyncio\n` +
     `for _t in list(_asyncio.all_tasks()):\n` +
     `    if _t is not _asyncio.current_task():\n` +
     `        _t.cancel()\n`;
+
+  // Lists (style SPIKE → opérations Python sur des variables typées 'List')
+  function listVarName(b) {
+    const id = b.getFieldValue('LIST');
+    const v = b.workspace ? b.workspace.getVariableById(id) : null;
+    const raw = v ? v.name : id;
+    return P.nameDB_.getName(raw, Blockly.Names.NameType.VARIABLE);
+  }
+
+  P.data_addtolist = b => {
+    const v = val(b, 'VALUE', '0');
+    return `${listVarName(b)}.append(${v})\n`;
+  };
+
+  P.data_deleteoflist = b => {
+    const i = val(b, 'INDEX', '1');
+    const n = listVarName(b);
+    return `del ${n}[int(${i}) - 1]\n`;
+  };
+
+  P.data_deletealloflist = b =>
+    `${listVarName(b)}.clear()\n`;
+
+  P.data_insertatlist = b => {
+    const v = val(b, 'VALUE', '0');
+    const i = val(b, 'INDEX', '1');
+    return `${listVarName(b)}.insert(int(${i}) - 1, ${v})\n`;
+  };
+
+  P.data_replaceitemoflist = b => {
+    const v = val(b, 'VALUE', '0');
+    const i = val(b, 'INDEX', '1');
+    return `${listVarName(b)}[int(${i}) - 1] = ${v}\n`;
+  };
+
+  P.data_itemoflist = b => {
+    const i = val(b, 'INDEX', '1');
+    return [`${listVarName(b)}[int(${i}) - 1]`, P.ORDER_MEMBER];
+  };
+
+  P.data_itemnumoflist = b => {
+    const v = val(b, 'VALUE', '0');
+    const n = listVarName(b);
+    return [`((${n}.index(${v}) + 1) if (${v}) in ${n} else 0)`, P.ORDER_CONDITIONAL];
+  };
+
+  P.data_lengthoflist = b =>
+    [`len(${listVarName(b)})`, P.ORDER_FUNCTION_CALL];
+
+  P.data_listcontainsitem = b => {
+    const v = val(b, 'VALUE', '0');
+    return [`(${v}) in ${listVarName(b)}`, P.ORDER_RELATIONAL];
+  };
+
+  // Operators (custom)
+  P.op_in_between = b => {
+    const v  = val(b, 'VAL', '0');
+    const lo = val(b, 'LO',  '0');
+    const hi = val(b, 'HI',  '0');
+    return [`(${lo}) <= (${v}) <= (${hi})`, P.ORDER_RELATIONAL];
+  };
+
+  P.op_text_contains = b => {
+    const t = P.valueToCode(b, 'TEXT', P.ORDER_RELATIONAL) || "''";
+    const s = P.valueToCode(b, 'SUB',  P.ORDER_RELATIONAL) || "''";
+    return [`(${s}) in (${t})`, P.ORDER_RELATIONAL];
+  };
 
   P.control_stop = b => {
     const target = b.getFieldValue('TARGET');
@@ -1158,11 +1422,148 @@ function defineBlocks() {
       `    _t.cancel()\n`
     );
   };
+
+  // --- My Blocks (procédures) : async def + await partout ---
+  // Le corps d'une procédure peut contenir des blocs SPIKE awaitables
+  // (motor.run_for_*, runloop.sleep_ms, …), donc la procédure doit être
+  // async, et les appels doivent utiliser `await`.
+
+  // Les overrides de procedures_def/call sont installés APRÈS Blockly.inject
+  // dans setupBlockly(), via applyProcedureGeneratorOverrides(). Si on les
+  // pose ici, Blockly les écrase pendant inject quand il populate forBlock.
+}
+
+// Asyncify-helper : transforme `def name(...):\n  body` en
+// `async def name(...):\n  global ...\n  body`. Idempotent (skip si déjà async).
+function asyncifyProcedureCode(code) {
+  const P = Blockly.Python;
+  if (!code || typeof code !== 'string') return code;
+  if (!/^def /m.test(code)) return code;
+  if (/^async def /m.test(code)) return code;
+  let out = code.replace(/^def /m, 'async def ');
+  out = out.replace(
+    /^(async def [^\n]+:\n)/m,
+    `$1${P.INDENT}global _mvmt_speed, _mvmt_dpr_mm, _motor_speed, _program_start_t\n`
+  );
+  return out;
+}
+
+// Override des générateurs procedures_call* (le call doit utiliser `await`).
+// Le def, lui, sera asyncifié en post-process dans workspaceToCode car Blockly
+// stocke la définition dans this.definitions_['%' + funcName] et n'expose
+// pas d'API simple pour wrapper proprement le générateur stock.
+function applyProcedureGeneratorOverrides() {
+  const P = Blockly.Python;
+  const getGen = (name) => (P.forBlock && P.forBlock[name]) || P[name];
+  const setGen = (name, fn) => { if (P.forBlock) P.forBlock[name] = fn; P[name] = fn; };
+
+  const origCallNoReturn = getGen('procedures_callnoreturn');
+  if (!origCallNoReturn) return;
+
+  setGen('procedures_callnoreturn', function(block, generator) {
+    const code = origCallNoReturn.call(this, block, generator);
+    return 'await ' + String(code);
+  });
 }
 
 
+// Force la couleur SPIKE des blocs de procédure et de leurs helpers de mutator,
+// désactive les variants return/ifreturn (inutiles pour l'équivalent SPIKE),
+// et retire la case « autoriser les ordres » du mutator (le corps est toujours là).
+function styleProcedureBlocks() {
+  // Couleur appliquée au bloc define + au bloc d'appel + aux helpers du mutator.
+  const types = [
+    'procedures_defnoreturn',
+    'procedures_callnoreturn',
+    'procedures_mutatorcontainer',
+    'procedures_mutatorarg',
+  ];
+  for (const t of types) {
+    const def = Blockly.Blocks[t];
+    if (!def || !def.init) continue;
+    const origInit = def.init;
+    def.init = function() {
+      origInit.call(this);
+      this.setColour(C.myblocks);
+    };
+  }
+
+  // Mutator container : on enlève le DummyInput "STATEMENT_INPUT" (case à
+  // cocher "autoriser les ordres") qui n'a pas de sens chez nous puisque
+  // les procédures ont toujours un corps.
+  const mc = Blockly.Blocks['procedures_mutatorcontainer'];
+  if (mc) {
+    mc.init = function() {
+      this.appendDummyInput()
+        .appendField(Blockly.Msg['PROCEDURES_MUTATORCONTAINER_TITLE'] || 'inputs');
+      this.appendStatementInput('STACK');
+      this.setColour(C.myblocks);
+      this.contextMenu = false;
+    };
+  }
+
+  // Pas besoin de fonction qui retourne ni de "si ... retourner" : on
+  // supprime carrément ces types de blocs.
+  delete Blockly.Blocks['procedures_defreturn'];
+  delete Blockly.Blocks['procedures_callreturn'];
+  delete Blockly.Blocks['procedures_ifreturn'];
+}
+
+// Force la couleur SPIKE sur les blocs stock Blockly utilisés dans la
+// catégorie Operators (logic / math / text). Sans ça ils gardent leur
+// teinte par défaut (bleu/vert Blockly), incohérente avec la catégorie.
+function styleOperatorBlocks() {
+  const stock = [
+    'logic_compare', 'logic_operation', 'logic_negate', 'logic_boolean',
+    'math_arithmetic', 'math_single', 'math_modulo', 'math_round',
+    'math_number', 'math_random_int',
+    'text', 'text_join', 'text_charAt', 'text_length',
+  ];
+  for (const t of stock) {
+    const def = Blockly.Blocks[t];
+    if (!def || !def.init) continue;
+    const origInit = def.init;
+    def.init = function() {
+      origInit.call(this);
+      this.setColour(C.operators);
+    };
+  }
+}
+
+// Idem pour les blocs stock liés aux variables scalaires.
+function styleVariableBlocks() {
+  const stock = ['variables_get', 'variables_set', 'math_change'];
+  for (const t of stock) {
+    const def = Blockly.Blocks[t];
+    if (!def || !def.init) continue;
+    const origInit = def.init;
+    def.init = function() {
+      origInit.call(this);
+      this.setColour(C.vars);
+    };
+  }
+}
+
+// Override de quelques libellés stock Blockly pour matcher le phrasing
+// SPIKE app (qui n'est pas tout à fait celui de Blockly anglais par défaut).
+function applySpikeMessageOverrides() {
+  if (typeof Blockly === 'undefined' || !Blockly.Msg) return;
+  Blockly.Msg['MATH_MODULO_TITLE']         = '%1 mod %2';
+  Blockly.Msg['MATH_RANDOM_INT_TITLE']     = 'pick random %1 to %2';
+  Blockly.Msg['MATH_SINGLE_OP_ABSOLUTE']   = 'abs';
+  Blockly.Msg['MATH_SINGLE_OP_ROOT']       = 'sqrt';
+  Blockly.Msg['TEXT_JOIN_TITLE_CREATEWITH'] = 'join';
+  Blockly.Msg['TEXT_LENGTH_TITLE']         = 'length of %1';
+  Blockly.Msg['TEXT_CHARAT_FROM_START']    = 'letter %1 of';
+  Blockly.Msg['TEXT_CHARAT_FROM_END']      = 'letter %1 of (from end)';
+}
+
 export function setupBlockly(container) {
+  applySpikeMessageOverrides();
   defineBlocks();
+  styleProcedureBlocks();
+  styleOperatorBlocks();
+  styleVariableBlocks();
 
   const ws = Blockly.inject(container, {
     toolbox: TOOLBOX,
@@ -1176,6 +1577,126 @@ export function setupBlockly(container) {
   Blockly.Python.addReservedWords(
     'motor,motor_pair,color,color_sensor,distance_sensor,force_sensor,hub,port,light_matrix,button,motion_sensor,sound,runloop'
   );
+
+  // Override des générateurs procedures_*. Doit être après Blockly.inject :
+  // celui-ci peuple forBlock avec les générateurs stock qui écraseraient
+  // nos versions si on les installait en amont.
+  applyProcedureGeneratorOverrides();
+
+  // --- Catégorie Variables custom : variables normales + listes nommées ---
+  ws.registerToolboxCategoryCallback('VARIABLE_AND_LIST', function(workspace) {
+    const xml = [];
+
+    // 1) Make a Variable (type vide = variable scalaire)
+    const btnVar = document.createElement('button');
+    btnVar.setAttribute('text', 'Make a Variable');
+    btnVar.setAttribute('callbackKey', 'CREATE_VAR_PLAIN');
+    xml.push(btnVar);
+
+    // Pour chaque variable scalaire : get / set / change
+    const plainVars = (workspace.getVariablesOfType('') || []).slice().sort((a, b) => a.name.localeCompare(b.name));
+    if (plainVars.length > 0) {
+      const first = plainVars[0];
+      const mkVarBlock = (type, fields = {}) => {
+        const el = document.createElement('block');
+        el.setAttribute('type', type);
+        el.setAttribute('gap', '8');
+        const fld = document.createElement('field');
+        fld.setAttribute('name', 'VAR');
+        fld.setAttribute('id', first.getId());
+        fld.setAttribute('variabletype', '');
+        fld.textContent = first.name;
+        el.appendChild(fld);
+        for (const [n, v] of Object.entries(fields)) {
+          const i = document.createElement('value');
+          i.setAttribute('name', n);
+          i.innerHTML = `<shadow type="math_number"><field name="NUM">${v}</field></shadow>`;
+          el.appendChild(i);
+        }
+        return el;
+      };
+      // Le bloc d'affichage (variables_get) pour chaque variable
+      for (const v of plainVars) {
+        const el = document.createElement('block');
+        el.setAttribute('type', 'variables_get');
+        const fld = document.createElement('field');
+        fld.setAttribute('name', 'VAR');
+        fld.setAttribute('id', v.getId());
+        fld.setAttribute('variabletype', '');
+        fld.textContent = v.name;
+        el.appendChild(fld);
+        xml.push(el);
+      }
+      xml.push(mkVarBlock('variables_set', { VALUE: 0 }));
+      xml.push(mkVarBlock('math_change',  { DELTA: 1 }));
+    }
+
+    // 2) Make a List (type 'List')
+    const btnList = document.createElement('button');
+    btnList.setAttribute('text', 'Make a List');
+    btnList.setAttribute('callbackKey', 'CREATE_VAR_LIST');
+    xml.push(btnList);
+
+    // Blocs liste pour le 1er item de la palette : Blockly choisira automatiquement
+    // la 1ère List existante via defaultType='List'.
+    const lists = workspace.getVariablesOfType('List') || [];
+    if (lists.length > 0) {
+      const listBlocks = [
+        'data_addtolist',
+        'data_deleteoflist',
+        'data_deletealloflist',
+        'data_insertatlist',
+        'data_replaceitemoflist',
+        'data_itemoflist',
+        'data_itemnumoflist',
+        'data_lengthoflist',
+        'data_listcontainsitem',
+      ];
+      for (const t of listBlocks) {
+        const el = document.createElement('block');
+        el.setAttribute('type', t);
+        el.setAttribute('gap', '8');
+        xml.push(el);
+      }
+    }
+
+    return xml;
+  });
+
+  ws.registerButtonCallback('CREATE_VAR_PLAIN', function(button) {
+    Blockly.Variables.createVariableButtonHandler(button.getTargetWorkspace(), null, '');
+  });
+  ws.registerButtonCallback('CREATE_VAR_LIST', function(button) {
+    Blockly.Variables.createVariableButtonHandler(button.getTargetWorkspace(), null, 'List');
+  });
+
+  // --- Shadow math_number sur chaque argument d'un appel de procédure ---
+  // Sans ça, les slots ARGn restent vides et on ne peut pas taper de valeur
+  // directement (il faut d'abord poser un bloc number dessus).
+  function addShadowsToProcCall(block) {
+    if (!block || !block.arguments_) return;
+    const shadowXml = '<shadow type="math_number"><field name="NUM">0</field></shadow>';
+    for (let i = 0; i < block.arguments_.length; i++) {
+      const input = block.getInput('ARG' + i);
+      if (!input || !input.connection) continue;
+      if (input.connection.targetBlock()) continue;          // déjà connecté
+      if (input.connection.getShadowDom()) continue;         // shadow déjà posé
+      input.connection.setShadowDom(Blockly.utils.xml.textToDom(shadowXml));
+    }
+  }
+
+  ws.addChangeListener(function(event) {
+    if (!event) return;
+    const tryBlock = (id) => {
+      const b = ws.getBlockById(id);
+      if (b && b.type === 'procedures_callnoreturn') addShadowsToProcCall(b);
+    };
+    if (event.type === Blockly.Events.BLOCK_CREATE) {
+      (event.ids || []).forEach(tryBlock);
+    } else if (event.type === Blockly.Events.BLOCK_CHANGE && event.element === 'mutation') {
+      tryBlock(event.blockId);
+    }
+  });
 
   // Imports SPIKE 3 en préface du code généré
   const origInit = Blockly.Python.init;
@@ -1191,6 +1712,13 @@ export function setupBlockly(container) {
     this.definitions_['import_hub']             = 'from hub import port, light_matrix, button, motion_sensor, sound, light';
     this.definitions_['import_runloop']         = 'import runloop';
     this.definitions_['import_sim_bridge']      = 'import _sim_bridge';
+
+    // Initialise chaque variable typée 'List' à [] au préambule.
+    const lists = workspace.getVariablesOfType ? workspace.getVariablesOfType('List') : [];
+    for (const v of lists) {
+      const name = this.nameDB_.getName(v.name, Blockly.Names.NameType.VARIABLE);
+      this.definitions_['list_var_' + v.getId()] = `${name} = []`;
+    }
   };
 
   // Ne génère du code que pour les piles accrochées à un bloc événement
@@ -1212,10 +1740,19 @@ export function setupBlockly(container) {
     let counter = 0;
 
     for (const block of workspace.getTopBlocks(true)) {
-      if (!block.type.startsWith('event_')) continue;
       if (block.disabled || (block.isEnabled && !block.isEnabled())) continue;
 
-      // Corps = chaîne de blocs après le hat
+      // 1) Procédures (My Blocks) → async def au niveau module.
+      if (block.type === 'procedures_defnoreturn') {
+        const out = this.blockToCode(block);
+        const procCode = Array.isArray(out) ? out[0] : out;
+        this.definitions_['proc_' + block.id] = procCode;
+        continue;
+      }
+
+      // 2) Événements → coroutine async + ajout à runloop.run(...).
+      if (!block.type.startsWith('event_')) continue;
+
       const next = block.getNextBlock();
       let body = '';
       if (next) {
@@ -1232,6 +1769,15 @@ export function setupBlockly(container) {
     const code = coros.length > 0
       ? `runloop.run(${coros.join(', ')})\n`
       : '';
+
+    // POST-PROCESS : Blockly stocke chaque procédure dans this.definitions_
+    // sous la forme « def name(): body ». On les transforme en `async def`
+    // + injection du `global ...`. Filet de sécurité indépendant des
+    // overrides de générateurs (qui peuvent être bypassés selon la version
+    // de Blockly).
+    for (const k of Object.keys(this.definitions_)) {
+      this.definitions_[k] = asyncifyProcedureCode(this.definitions_[k]);
+    }
 
     return this.finish(code);
   };

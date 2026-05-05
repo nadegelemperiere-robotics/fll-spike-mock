@@ -6,7 +6,8 @@ import * as THREE from 'three';
 // Couleurs reconnues par le capteur SPIKE Prime (les 9 officielles).
 const COLOR_BINS = [
   { name: 'black',   rgb: [30,  30,  30] },
-  { name: 'magenta', rgb: [200, 30,  130] },
+  { name: 'magenta', rgb: [244, 142,  192] },
+  { name: 'purple', rgb: [110, 100,  178] },
   { name: 'blue',    rgb: [40,  100, 200] },
   { name: 'azure',   rgb: [60,  170, 230] },
   { name: 'green',   rgb: [50,  170, 80] },
@@ -17,6 +18,14 @@ const COLOR_BINS = [
 ];
 
 function nearestColor(r, g, b) {
+  // Garde de saturation : sur une jonction noir/blanc, l'anti-aliasing produit
+  // des pixels gris (~128,128,128). Le nearest-neighbor saturé tomberait sur
+  // "green" ou "orange". On force black/white pour les zones peu chromatiques.
+  const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+  if (chroma < 35) {
+    const lum = 0.2126*r + 0.7152*g + 0.0722*b;
+    return lum < 90 ? 'black' : 'white';
+  }
   let best = null, bestD = Infinity;
   for (const c of COLOR_BINS) {
     const [cr, cg, cb] = c.rgb;
@@ -24,6 +33,25 @@ function nearestColor(r, g, b) {
     if (d < bestD) { bestD = d; best = c.name; }
   }
   return best;
+}
+
+// Moyenne RGB sur une petite fenêtre autour du point lu : lisse les jonctions
+// et reflète mieux le spot ~5 mm du vrai capteur SPIKE.
+function sampleAvgRGB(ctx, cx, cy, w, h, half = 1) {
+  const x0 = Math.max(0, cx - half);
+  const y0 = Math.max(0, cy - half);
+  const x1 = Math.min(w - 1, cx + half);
+  const y1 = Math.min(h - 1, cy + half);
+  const dw = x1 - x0 + 1;
+  const dh = y1 - y0 + 1;
+  if (dw <= 0 || dh <= 0) return null;
+  const data = ctx.getImageData(x0, y0, dw, dh).data;
+  let r = 0, g = 0, b = 0;
+  const n = data.length / 4;
+  for (let i = 0; i < data.length; i += 4) {
+    r += data[i]; g += data[i+1]; b += data[i+2];
+  }
+  return [r / n, g / n, b / n];
 }
 
 export function createSensorReader(state) {
@@ -38,11 +66,13 @@ export function createSensorReader(state) {
       const sensor = state.robotModel.sensors.find(s => s.port === port && s.type === 'color_sensor');
       if (!sensor) return null;
       const { x, z } = sensorWorldPos(state, sensor);
-      const px = Math.floor((x + state.matWidthMm / 2) / state.matWidthMm * state.matCanvas.width);
-      const py = Math.floor((z + state.matHeightMm / 2) / state.matHeightMm * state.matCanvas.height);
-      if (px < 0 || py < 0 || px >= state.matCanvas.width || py >= state.matCanvas.height) return null;
-      const data = state.matCtx.getImageData(px, py, 1, 1).data;
-      return nearestColor(data[0], data[1], data[2]);
+      const w = state.matCanvas.width, h = state.matCanvas.height;
+      const px = Math.floor((x + state.matWidthMm / 2) / state.matWidthMm * w);
+      const py = Math.floor((z + state.matHeightMm / 2) / state.matHeightMm * h);
+      if (px < 0 || py < 0 || px >= w || py >= h) return null;
+      const rgb = sampleAvgRGB(state.matCtx, px, py, w, h);
+      if (!rgb) return null;
+      return nearestColor(rgb[0], rgb[1], rgb[2]);
     },
 
     readReflected(port) {
@@ -50,12 +80,13 @@ export function createSensorReader(state) {
       const sensor = state.robotModel.sensors.find(s => s.port === port && s.type === 'color_sensor');
       if (!sensor) return 0;
       const { x, z } = sensorWorldPos(state, sensor);
-      const px = Math.floor((x + state.matWidthMm / 2) / state.matWidthMm * state.matCanvas.width);
-      const py = Math.floor((z + state.matHeightMm / 2) / state.matHeightMm * state.matCanvas.height);
-      if (px < 0 || py < 0 || px >= state.matCanvas.width || py >= state.matCanvas.height) return 0;
-      const data = state.matCtx.getImageData(px, py, 1, 1).data;
-      // Luminance perçue
-      const lum = 0.2126*data[0] + 0.7152*data[1] + 0.0722*data[2];
+      const w = state.matCanvas.width, h = state.matCanvas.height;
+      const px = Math.floor((x + state.matWidthMm / 2) / state.matWidthMm * w);
+      const py = Math.floor((z + state.matHeightMm / 2) / state.matHeightMm * h);
+      if (px < 0 || py < 0 || px >= w || py >= h) return 0;
+      const rgb = sampleAvgRGB(state.matCtx, px, py, w, h);
+      if (!rgb) return 0;
+      const lum = 0.2126*rgb[0] + 0.7152*rgb[1] + 0.0722*rgb[2];
       return Math.round(lum / 255 * 100);
     },
 
@@ -64,14 +95,15 @@ export function createSensorReader(state) {
       const sensor = state.robotModel.sensors.find(s => s.port === port && s.type === 'color_sensor');
       if (!sensor) return [0, 0, 0, 0];
       const { x, z } = sensorWorldPos(state, sensor);
-      const px = Math.floor((x + state.matWidthMm / 2) / state.matWidthMm * state.matCanvas.width);
-      const py = Math.floor((z + state.matHeightMm / 2) / state.matHeightMm * state.matCanvas.height);
-      if (px < 0 || py < 0 || px >= state.matCanvas.width || py >= state.matCanvas.height) return [0, 0, 0, 0];
-      const data = state.matCtx.getImageData(px, py, 1, 1).data;
-      // Échelle SPIKE : 0..1024 par composante
+      const w = state.matCanvas.width, h = state.matCanvas.height;
+      const px = Math.floor((x + state.matWidthMm / 2) / state.matWidthMm * w);
+      const py = Math.floor((z + state.matHeightMm / 2) / state.matHeightMm * h);
+      if (px < 0 || py < 0 || px >= w || py >= h) return [0, 0, 0, 0];
+      const rgb = sampleAvgRGB(state.matCtx, px, py, w, h);
+      if (!rgb) return [0, 0, 0, 0];
       const scale = (v) => Math.round(v * 1024 / 255);
-      const lum = 0.2126*data[0] + 0.7152*data[1] + 0.0722*data[2];
-      return [scale(data[0]), scale(data[1]), scale(data[2]), scale(lum)];
+      const lum = 0.2126*rgb[0] + 0.7152*rgb[1] + 0.0722*rgb[2];
+      return [scale(rgb[0]), scale(rgb[1]), scale(rgb[2]), scale(lum)];
     },
 
     readDistance(port) {

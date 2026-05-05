@@ -24,7 +24,18 @@ const I = {
   STOP: 0,
   BTN_LEFT: 1,
   BTN_RIGHT: 2,
+  DELAY_DUMMY: 3,  // slot jamais écrit, sert d'argument à Atomics.wait pour bloquer
 };
+
+// Latence BLE simulée : chaque commande moteur/capteur bloque le worker
+// pendant ~10 ms via Atomics.wait avec timeout. Le main thread reste libre
+// (rAF, scene update, clic Stop), seul le thread Python est gelé. Représentatif
+// de la latence réelle SPIKE Prime sur Bluetooth Low Energy.
+const BLE_LATENCY_MS = 5;
+function bleDelay() {
+  if (!int32Mirror) return;
+  Atomics.wait(int32Mirror, I.DELAY_DUMMY, 0, BLE_LATENCY_MS);
+}
 
 function portFloat(port, off) {
   const idx = 'ABCDEF'.indexOf(String(port || '').toUpperCase());
@@ -62,12 +73,14 @@ const bridge = {
     }
   },
 
-  // --- Écritures (fire-and-forget vers le main thread) ---
-  setMotor: (p, v) => postCmd('setMotor', [p, v]),
-  stopMotor: (p) => postCmd('stopMotor', [p]),
-  setMotorPair: (l, r) => postCmd('setMotorPair', [l, r]),
-  setMotionYawFace: (f) => postCmd('setMotionYawFace', [f]),
-  setMotionTBOffset: (rad) => postCmd('setMotionTBOffset', [rad]),
+  // --- Écritures moteur/capteur (latence BLE 10 ms) ---
+  setMotor: (p, v) => { bleDelay(); postCmd('setMotor', [p, v]); },
+  stopMotor: (p) => { bleDelay(); postCmd('stopMotor', [p]); },
+  setMotorPair: (l, r) => { bleDelay(); postCmd('setMotorPair', [l, r]); },
+  setMotionYawFace: (f) => { bleDelay(); postCmd('setMotionYawFace', [f]); },
+  setMotionTBOffset: (rad) => { bleDelay(); postCmd('setMotionTBOffset', [rad]); },
+
+  // --- Écritures hub (pas de latence : embarquées sur le hub) ---
   requestStop: () => {
     Atomics.store(int32Mirror, I.STOP, 1);
     postCmd('requestStop', []);
@@ -82,17 +95,19 @@ const bridge = {
   hubButtonLight:    (r, g, b) => postCmd('hubButtonLight', [r, g, b]),
   hubLightColor:     (lightId, colorId) => postCmd('hubLightColor', [lightId, colorId]),
 
-  // --- Lectures synchrones (depuis le miroir SAB) ---
-  getMotorPosition: (p) => readFloat(portFloat(p, PF.POS)) || 0,
-  getMotorVelocity: (p) => readFloat(portFloat(p, PF.VEL)) || 0,
-  getHeading: () => floatMirror[F.HEADING] || 0,
-  getAngularVelocity: () => floatMirror[F.ANGULAR_VEL] || 0,
+  // --- Lectures moteur/capteur (latence BLE 10 ms, lecture depuis le miroir SAB) ---
+  getMotorPosition: (p) => { bleDelay(); return readFloat(portFloat(p, PF.POS)) || 0; },
+  getMotorVelocity: (p) => { bleDelay(); return readFloat(portFloat(p, PF.VEL)) || 0; },
+  getHeading: () => { bleDelay(); return floatMirror[F.HEADING] || 0; },
+  getAngularVelocity: () => { bleDelay(); return floatMirror[F.ANGULAR_VEL] || 0; },
   getColor: (p) => {
+    bleDelay();
     const v = floatMirror[portFloat(p, PF.COLOR)];
     return Number.isNaN(v) ? null : v;
   },
-  getReflectedLight: (p) => readFloat(portFloat(p, PF.REFL)) || 0,
+  getReflectedLight: (p) => { bleDelay(); return readFloat(portFloat(p, PF.REFL)) || 0; },
   getColorRGBI: (p) => {
+    bleDelay();
     const ri = portFloat(p, PF.R);
     if (ri < 0 || Number.isNaN(floatMirror[ri])) return null;
     return [
@@ -102,8 +117,10 @@ const bridge = {
       floatMirror[portFloat(p, PF.I)],
     ];
   },
-  getDistance: (p) => readFloat(portFloat(p, PF.DIST)) ?? 200,
-  getForce: (p) => readFloat(portFloat(p, PF.FORCE)) || 0,
+  getDistance: (p) => { bleDelay(); return readFloat(portFloat(p, PF.DIST)) ?? 200; },
+  getForce: (p) => { bleDelay(); return readFloat(portFloat(p, PF.FORCE)) || 0; },
+
+  // --- Lectures hub (instantanées) ---
   isStopped: () => Atomics.load(int32Mirror, I.STOP) !== 0,
   hubButtonPressed: (id) => {
     if (id === 1) return Atomics.load(int32Mirror, I.BTN_LEFT);

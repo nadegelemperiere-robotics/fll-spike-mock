@@ -29,6 +29,22 @@ const I = {
   BTN_RIGHT: 2,
 };
 
+// Mapping nom de couleur (renvoyé par sensors.readColor) → ID color.py.
+// On le fait côté main pour pouvoir stocker un nombre dans le miroir Float64
+// (les strings deviendraient NaN dans un Float64Array).
+const COLOR_NAME_TO_ID = {
+  'black':   0,
+  'magenta': 1,
+  'purple':  2,
+  'blue':    3,
+  'azure':   4,
+  'green':   6,
+  'yellow':  7,
+  'orange':  8,
+  'red':     9,
+  'white':  10,
+};
+
 const SPIKE3_MODULES = [
   '_sim', 'hub', 'motor', 'motor_pair', 'color', 'orientation',
   'color_sensor', 'distance_sensor', 'force_sensor', 'runloop',
@@ -174,7 +190,9 @@ function startMirrorLoop() {
       floatMirror[F.ANGULAR_VEL] = c.getAngularVelocity();
       // Sensors (NaN si capteur absent → bridge Python renvoie None)
       for (const port of 'ABCDEF') {
-        setSensorFloat(portFloat(port, PF.COLOR), c.readColorSensor(port));
+        const colorName = c.readColorSensor(port);
+        const colorId = colorName == null ? null : (COLOR_NAME_TO_ID[colorName] ?? -1);
+        setSensorFloat(portFloat(port, PF.COLOR), colorId);
         setSensorFloat(portFloat(port, PF.REFL),  c.readReflectedLight(port));
         const rgbi = c.readColorRGBI(port);
         if (rgbi) {

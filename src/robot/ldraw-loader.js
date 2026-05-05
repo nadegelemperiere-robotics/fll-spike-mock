@@ -25,12 +25,12 @@ function frontAxisToRotation(front) {
 }
 
 const PLACEHOLDER_COLORS = {
-  hub: 0xffd166,
-  motor: 0x4a4a4a,
-  color_sensor: 0x4dd2ff,
-  distance_sensor: 0xff8c42,
-  force_sensor: 0xff5e7d,
-  wheel: 0x1a1f26,
+  hub: 0xf3ce0e,
+  motor: 0x2ad7ea,
+  color_sensor: 0x1e1e20,
+  distance_sensor: 0x1e1e20,
+  force_sensor: 0x1e1e20,
+  wheel: 0x2ad7ea,
 };
 
 const PLACEHOLDER_SIZES_MM = {
@@ -56,9 +56,10 @@ export async function loadLdrawModel(ldrText, config = {}) {
   const main = files.find(f => f.name === '__root__') || files[0];
 
   const components = [];
+  const allPositions = [];  // toutes les pièces (classées + Technic) pour le contour
   const unclassified = new Set();
   const identity = new THREE.Matrix4();
-  expandFile(files, main, identity, components, unclassified);
+  expandFile(files, main, identity, components, unclassified, allPositions);
 
   // Auto-assigner les ports A-F aux moteurs et capteurs dans l'ordre où
   // ils apparaissent (ordre de parsing).
@@ -79,6 +80,10 @@ export async function loadLdrawModel(ldrText, config = {}) {
     for (const c of components) {
       c.position = [c.position[0] - hx, c.position[1] - hy, c.position[2] - hz];
     }
+    for (let i = 0; i < allPositions.length; i++) {
+      const [x, y, z] = allPositions[i];
+      allPositions[i] = [x - hx, y - hy, z - hz];
+    }
   }
 
   // Appliquer la rotation `front` aux positions pour passer en repère canonique
@@ -92,10 +97,17 @@ export async function loadLdrawModel(ldrText, config = {}) {
       const [x, y, z] = c.position;
       c.position = [cos * x + sin * z, y, -sin * x + cos * z];
     }
+    for (let i = 0; i < allPositions.length; i++) {
+      const [x, y, z] = allPositions[i];
+      allPositions[i] = [cos * x + sin * z, y, -sin * x + cos * z];
+    }
   }
 
   // Construire un groupe 3D simple avec des boîtes colorées
   const group = buildPlaceholderGroup(components);
+
+  // Contour : convex hull XZ de toutes les pièces du .io, dessiné en noir.
+  addHullOutline(group, allPositions);
 
   // Diagnostic systématique
   if (typeof window !== 'undefined' && window.simLog) {
@@ -158,7 +170,7 @@ function parseMpdFiles(text) {
 }
 
 
-function expandFile(files, file, parentMatrix, components, unclassified) {
+function expandFile(files, file, parentMatrix, components, unclassified, allPositions) {
   for (const line of file.lines) {
     const trimmed = line.trim();
     if (!trimmed.startsWith('1 ')) continue;
@@ -193,25 +205,33 @@ function expandFile(files, file, parentMatrix, components, unclassified) {
       const quat = new THREE.Quaternion();
       const scale = new THREE.Vector3();
       worldM.decompose(pos, quat, scale);
-      // LDU -> mm avec inversion Y (LDraw Y pointe vers le bas)
+      const posMm = [pos.x * LDU_TO_MM, -pos.y * LDU_TO_MM, pos.z * LDU_TO_MM];
       components.push({
         type: cls.type,
         partId: partName,
-        position: [pos.x * LDU_TO_MM, -pos.y * LDU_TO_MM, pos.z * LDU_TO_MM],
+        position: posMm,
         rotation: quat.toArray(),
         meta: cls,
       });
+      if (allPositions) allPositions.push([...posMm]);
       continue;
     }
 
     // Sinon référence à un sous-modèle MPD ?
     const sub = files.find(s => s.name === partName);
     if (sub) {
-      expandFile(files, sub, worldM, components, unclassified);
+      expandFile(files, sub, worldM, components, unclassified, allPositions);
       continue;
     }
 
-    // Pièce inconnue : on l'enregistre pour le diagnostic
+    // Pièce Technic non classée : on garde quand même sa position pour le contour.
+    if (allPositions) {
+      const pos = new THREE.Vector3();
+      const quat = new THREE.Quaternion();
+      const scale = new THREE.Vector3();
+      worldM.decompose(pos, quat, scale);
+      allPositions.push([pos.x * LDU_TO_MM, -pos.y * LDU_TO_MM, pos.z * LDU_TO_MM]);
+    }
     if (unclassified) unclassified.add(partName);
   }
 }
@@ -231,6 +251,44 @@ function collectAllPartIds(files) {
 }
 
 
+// --- Contour : enveloppe convexe XZ ---
+
+// Andrew's monotone chain. Entrée : points [[x,z], …]. Sortie : sommets de
+// l'enveloppe en CCW. O(n log n).
+function convexHullXZ(points) {
+  if (points.length < 3) return points.slice();
+  const pts = points.slice().sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower = [];
+  for (const p of pts) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper = [];
+  for (let i = pts.length - 1; i >= 0; i--) {
+    const p = pts[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  upper.pop(); lower.pop();
+  return lower.concat(upper);
+}
+
+function addHullOutline(group, allPositions) {
+  if (!allPositions || allPositions.length < 3) return;
+  const xz = allPositions.map(p => [p[0], p[2]]);
+  const hull = convexHullXZ(xz);
+  if (hull.length < 3) return;
+  const points = hull.map(([x, z]) => new THREE.Vector3(x, 30, z));
+  const geom = new THREE.BufferGeometry().setFromPoints(points);
+  const mat = new THREE.LineBasicMaterial({ color: 0x000000, depthTest: false });
+  const line = new THREE.LineLoop(geom, mat);
+  line.renderOrder = 200;
+  line.userData.spikeType = 'hull';
+  group.add(line);
+}
+
+
 // --- Placeholder geometry ---
 
 function buildPlaceholderGroup(components) {
@@ -238,9 +296,10 @@ function buildPlaceholderGroup(components) {
   for (const c of components) {
     const size = PLACEHOLDER_SIZES_MM[c.type] || [16, 16, 16];
     const geom = new THREE.BoxGeometry(size[0], size[1], size[2]);
-    const mat = new THREE.MeshStandardMaterial({
+    // MeshBasicMaterial : pas d'éclairage, la couleur est rendue telle quelle.
+    // En vue top-down ça évite la désaturation imposée par le PBR.
+    const mat = new THREE.MeshBasicMaterial({
       color: PLACEHOLDER_COLORS[c.type] || 0x888888,
-      roughness: 0.6,
     });
     const mesh = new THREE.Mesh(geom, mat);
     mesh.position.set(c.position[0], c.position[1], c.position[2]);

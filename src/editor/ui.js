@@ -336,4 +336,103 @@ document.getElementById('stop-btn').onclick = () => {
   simStatus.textContent = 'Arrêté';
 };
 
+// --- Charger / Sauver ---
+function downloadBlob(name, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function pickFile(accept) {
+  return new Promise((resolve) => {
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = accept;
+    inp.onchange = () => {
+      const f = inp.files?.[0];
+      if (!f) return resolve(null);
+      const reader = new FileReader();
+      reader.onload = () => resolve({ name: f.name, content: String(reader.result) });
+      reader.onerror = () => resolve(null);
+      reader.readAsText(f);
+    };
+    inp.click();
+  });
+}
+
+// Bascule d'onglet sans déclencher syncBlocksToPython (qui écraserait
+// le code qu'on vient de charger).
+function activateTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('hidden', c.id !== `tab-${name}`));
+}
+
+function isBlocksTabActive() {
+  return document.querySelector('.tab[data-tab="blocks"]')?.classList.contains('active');
+}
+
+// Ouvre un vrai « Save As » natif si l'API File System Access est dispo
+// (Chrome/Edge), sinon retombe sur prompt + téléchargement classique (Firefox/Safari).
+async function saveWithDialog(suggested, content, mime, ext) {
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: suggested,
+        types: [{ description: ext.toUpperCase(), accept: { [mime]: ['.' + ext] } }],
+      });
+      const w = await handle.createWritable();
+      await w.write(content);
+      await w.close();
+      return handle.name;
+    } catch (e) {
+      if (e.name === 'AbortError') return null;
+      console.warn('showSaveFilePicker indisponible, fallback prompt :', e);
+    }
+  }
+  const name = window.prompt('Nom du fichier :', suggested);
+  if (!name) return null;
+  const finalName = name.toLowerCase().endsWith('.' + ext) ? name : `${name}.${ext}`;
+  downloadBlob(finalName, content, mime);
+  return finalName;
+}
+
+document.getElementById('save-btn').onclick = async () => {
+  if (isBlocksTabActive()) {
+    const xml = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(blocklyWorkspace));
+    const name = await saveWithDialog('program.xml', xml, 'application/xml', 'xml');
+    if (name) log(`Blocs sauvés (${name}).`, 'ok');
+  } else {
+    const name = await saveWithDialog('program.py', monaco.getValue(), 'text/x-python', 'py');
+    if (name) log(`Python sauvé (${name}).`, 'ok');
+  }
+};
+
+document.getElementById('load-btn').onclick = async () => {
+  const f = await pickFile('.py,.xml');
+  if (!f) return;
+  const isXml = f.name.toLowerCase().endsWith('.xml');
+  if (isXml) {
+    try {
+      const dom = Blockly.utils.xml.textToDom(f.content);
+      blocklyWorkspace.clear();
+      Blockly.Xml.domToWorkspace(dom, blocklyWorkspace);
+      activateTab('blocks');
+      log(`Blocs chargés depuis ${f.name}.`, 'ok');
+    } catch (e) {
+      log('Erreur lecture XML : ' + e.message, 'err');
+    }
+  } else {
+    monaco.setValue(f.content);
+    activateTab('python');
+    log(`Python chargé depuis ${f.name}.`, 'ok');
+  }
+  saveSession();
+};
+
 log('Prêt. Importez un robot et un mat pour commencer.', 'info');

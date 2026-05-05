@@ -26,6 +26,8 @@
       <button class="btn primary" id="run-btn">▶ Exécuter</button>
       <button class="btn" id="stop-btn">■ Stop</button>
       <button class="btn" id="reset-btn">⟲ Reset</button>
+      <button class="btn" id="load-btn" title="Charger un fichier .py ou .xml">📂 Charger</button>
+      <button class="btn" id="save-btn" title="Sauver le code/les blocs">💾 Sauver</button>
     </div>
   </header>
 
@@ -80,7 +82,6 @@
 
   <script src="https://unpkg.com/blockly@10.4.3/blockly.min.js"></script>
   <script src="https://unpkg.com/blockly@10.4.3/python_compressed.js"></script>
-  <script src="https://unpkg.com/blockly@10.4.3/msg/fr.js"></script>
   <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
   <!-- Pyodide est chargé dans le Web Worker (src/editor/python-worker.js), pas sur le main thread. -->
 
