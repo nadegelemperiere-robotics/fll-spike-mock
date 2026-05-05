@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -23,18 +23,18 @@
         <span class="select-label">Mat</span>
         <select id="mat-select" class="btn"></select>
       </label>
-      <button class="btn primary" id="run-btn">▶ Exécuter</button>
+      <button class="btn primary" id="run-btn">▶ Run</button>
       <button class="btn" id="stop-btn">■ Stop</button>
       <button class="btn" id="reset-btn">⟲ Reset</button>
-      <button class="btn" id="load-btn" title="Charger un fichier .py ou .xml">📂 Charger</button>
-      <button class="btn" id="save-btn" title="Sauver le code/les blocs">💾 Sauver</button>
+      <button class="btn" id="load-btn" title="Load a .py or .xml file">📂 Load</button>
+      <button class="btn" id="save-btn" title="Save code or blocks">💾 Save</button>
     </div>
   </header>
 
   <main class="layout">
     <section class="panel editor-panel">
       <div class="tabs">
-        <button class="tab active" data-tab="blocks">🧩 Blocs</button>
+        <button class="tab active" data-tab="blocks">🧩 Blocks</button>
         <button class="tab" data-tab="python">🐍 Python</button>
       </div>
       <div class="tab-content" id="tab-blocks">
@@ -45,16 +45,16 @@
       </div>
     </section>
 
-    <div class="splitter" id="layout-splitter" title="Glisser pour redimensionner"></div>
+    <div class="splitter" id="layout-splitter" title="Drag to resize"></div>
 
     <section class="panel simulator-panel">
       <div class="canvas-wrapper">
         <div class="sim-header">
-          <span id="robot-name">Aucun robot</span>
+          <span id="robot-name">No robot</span>
           <span class="sep">·</span>
-          <span id="mat-name">Aucun mat</span>
+          <span id="mat-name">No mat</span>
           <span class="sep">·</span>
-          <span id="sim-status">Prêt</span>
+          <span id="sim-status">Ready</span>
         </div>
         <canvas id="sim-canvas"></canvas>
         <div class="sim-overlay">
