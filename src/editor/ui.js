@@ -114,15 +114,15 @@ document.querySelectorAll('.tab').forEach(tab => {
   };
 });
 
-// --- Initialisation ---
-log('Initialisation du simulateur...', 'info');
+// --- Init ---
+log('Initializing simulator…', 'info');
 
-// Scène 3D
+// 3D scene
 const scene = await initScene(document.getElementById('sim-canvas'));
 scene.onStartPoseChanged = saveSession;
 const hubDisplay = new HubDisplay();
 window.hubDisplay = hubDisplay;
-log('Scène 3D prête.', 'ok');
+log('3D scene ready.', 'ok');
 
 // --- Sélecteurs robot / mat (alimentés par les manifestes du serveur) ---
 const matSelect = document.getElementById('mat-select');
@@ -134,7 +134,7 @@ async function fetchManifest(path) {
     if (!resp.ok) return [];
     return await resp.json();
   } catch (e) {
-    log(`Manifest ${path} introuvable.`, 'err');
+    log(`Manifest ${path} not found.`, 'err');
     return [];
   }
 }
@@ -152,32 +152,32 @@ function populateSelect(selectEl, items, selectedFile) {
 
 async function loadMatByFile(file) {
   if (!file) return;
-  log(`Chargement mat ${file}...`, 'info');
+  log(`Loading mat ${file}…`, 'info');
   try {
     const resp = await fetch(`mats/${file}?v=${Date.now()}`, { cache: 'no-store' });
-    if (!resp.ok) throw new Error(`mats/${file} introuvable`);
+    if (!resp.ok) throw new Error(`mats/${file} not found`);
     const config = JSON.parse(await resp.text());
     await loadMat(scene, config);
     matName.textContent = config.name || file;
     selectedMatFile = file;
     saveSession();
-    log(`Mat ${config.width_mm}×${config.height_mm}mm chargé.`, 'ok');
+    log(`Mat ${config.width_mm}×${config.height_mm}mm loaded.`, 'ok');
   } catch (err) {
-    log('Erreur chargement mat: ' + err.message, 'err');
+    log('Mat load error: ' + err.message, 'err');
     console.error(err);
   }
 }
 
 async function loadRobotByFile(file) {
   if (!file) return;
-  log(`Chargement robot ${file}...`, 'info');
+  log(`Loading robot ${file}…`, 'info');
   try {
     const resp = await fetch(`robots/${file}?v=${Date.now()}`, { cache: 'no-store' });
-    if (!resp.ok) throw new Error(`robots/${file} introuvable`);
+    if (!resp.ok) throw new Error(`robots/${file} not found`);
     const config = JSON.parse(await resp.text());
-    if (!config.model) throw new Error('JSON robot sans champ "model"');
+    if (!config.model) throw new Error('Robot JSON missing "model" field');
     const modelResp = await fetch(`robots/${config.model}?v=${Date.now()}`, { cache: 'no-store' });
-    if (!modelResp.ok) throw new Error(`robots/${config.model} introuvable`);
+    if (!modelResp.ok) throw new Error(`robots/${config.model} not found`);
     let ldrText;
     if (config.model.toLowerCase().endsWith('.io')) {
       const blob = await modelResp.blob();
@@ -189,9 +189,9 @@ async function loadRobotByFile(file) {
     robotName.textContent = config.name || file;
     selectedRobotFile = file;
     saveSession();
-    log('Robot chargé.', 'ok');
+    log('Robot loaded.', 'ok');
   } catch (err) {
-    log('Erreur chargement robot: ' + err.message, 'err');
+    log('Robot load error: ' + err.message, 'err');
     console.error(err);
   }
 }
@@ -202,8 +202,8 @@ robotSelect.addEventListener('change', () => loadRobotByFile(robotSelect.value))
 document.getElementById('reset-btn').onclick = () => {
   resetSimulation(scene);
   hubDisplay.reset();
-  simStatus.textContent = 'Prêt';
-  log('Simulation réinitialisée.', 'info');
+  simStatus.textContent = 'Ready';
+  log('Simulation reset.', 'info');
 };
 
 // Éditeurs
@@ -301,31 +301,31 @@ await initSelectorsAndRestore();
 // Initialiser Pyodide dans un Web Worker (n'empêche pas le chargement mat/robot).
 // Le worker permet d'interrompre des boucles Python pures (while True: pass) :
 // le main thread reste libre pour gérer le clic Stop.
-log('Chargement de Pyodide (worker)...', 'info');
+log('Loading Pyodide (worker)…', 'info');
 const pyodideReady = initRunner(scene, log).then(r => {
-  if (r?.ready) log('API SPIKE 3 chargée.', 'ok');
+  if (r?.ready) log('SPIKE 3 API loaded.', 'ok');
   return r;
 });
 
-// --- Boutons run/stop ---
+// --- Run / Stop buttons ---
 document.getElementById('run-btn').onclick = async () => {
   const r = await pyodideReady;
-  if (!r?.ready) { log('Pyodide indisponible.', 'err'); return; }
+  if (!r?.ready) { log('Pyodide unavailable.', 'err'); return; }
   const code = getActiveCode();
-  if (!code.trim()) { log('Code vide.', 'err'); return; }
-  simStatus.textContent = 'En cours...';
+  if (!code.trim()) { log('Empty code.', 'err'); return; }
+  simStatus.textContent = 'Running…';
   try {
     const result = await runPython(code);
-    simStatus.textContent = result?.stopped ? 'Arrêté' : 'Terminé';
+    simStatus.textContent = result?.stopped ? 'Stopped' : 'Done';
   } catch (e) {
     log(String(e), 'err');
-    simStatus.textContent = 'Erreur';
+    simStatus.textContent = 'Error';
   }
 };
 
 document.getElementById('stop-btn').onclick = () => {
   stopPython();
-  simStatus.textContent = 'Arrêté';
+  simStatus.textContent = 'Stopped';
 };
 
 // --- Charger / Sauver ---
@@ -384,10 +384,10 @@ async function saveWithDialog(suggested, content, mime, ext) {
       return handle.name;
     } catch (e) {
       if (e.name === 'AbortError') return null;
-      console.warn('showSaveFilePicker indisponible, fallback prompt :', e);
+      console.warn('showSaveFilePicker unavailable, falling back to prompt:', e);
     }
   }
-  const name = window.prompt('Nom du fichier :', suggested);
+  const name = window.prompt('File name:', suggested);
   if (!name) return null;
   const finalName = name.toLowerCase().endsWith('.' + ext) ? name : `${name}.${ext}`;
   downloadBlob(finalName, content, mime);
@@ -398,10 +398,10 @@ document.getElementById('save-btn').onclick = async () => {
   if (isBlocksTabActive()) {
     const xml = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(blocklyWorkspace));
     const name = await saveWithDialog('program.xml', xml, 'application/xml', 'xml');
-    if (name) log(`Blocs sauvés (${name}).`, 'ok');
+    if (name) log(`Blocks saved (${name}).`, 'ok');
   } else {
     const name = await saveWithDialog('program.py', monaco.getValue(), 'text/x-python', 'py');
-    if (name) log(`Python sauvé (${name}).`, 'ok');
+    if (name) log(`Python saved (${name}).`, 'ok');
   }
 };
 
@@ -415,16 +415,16 @@ document.getElementById('load-btn').onclick = async () => {
       blocklyWorkspace.clear();
       Blockly.Xml.domToWorkspace(dom, blocklyWorkspace);
       activateTab('blocks');
-      log(`Blocs chargés depuis ${f.name}.`, 'ok');
+      log(`Blocks loaded from ${f.name}.`, 'ok');
     } catch (e) {
-      log('Erreur lecture XML : ' + e.message, 'err');
+      log('XML read error: ' + e.message, 'err');
     }
   } else {
     monaco.setValue(f.content);
     activateTab('python');
-    log(`Python chargé depuis ${f.name}.`, 'ok');
+    log(`Python loaded from ${f.name}.`, 'ok');
   }
   saveSession();
 };
 
-log('Prêt. Importez un robot et un mat pour commencer.', 'info');
+log('Ready. Pick a robot and a mat to get started.', 'info');

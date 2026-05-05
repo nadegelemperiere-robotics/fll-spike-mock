@@ -249,7 +249,9 @@ function setupRobotDrag(state) {
   canvas.addEventListener('pointerdown', (e) => {
     if (!isOverRobot(e)) return;
     state.dragging = true;
-    dragMode = e.altKey ? 'rotate' : 'move';
+    // Shift+drag pour tourner ; sinon translation. Alt+drag est évité car
+    // ChromeOS l'intercepte pour ses propres menus.
+    dragMode = e.shiftKey ? 'rotate' : 'move';
     canvas.setPointerCapture(e.pointerId);
     canvas.style.cursor = 'grabbing';
     e.preventDefault();

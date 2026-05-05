@@ -1,8 +1,8 @@
 // src/editor/monaco-config.js
 // Charge Monaco depuis CDN et configure l'autocomplete pour l'API SPIKE.
 
-const STARTER = `# Programme SPIKE Prime (SPIKE App 3)
-# Importez un robot et un mat puis cliquez sur Exécuter.
+const STARTER = `# SPIKE Prime program (SPIKE App 3)
+# Pick a robot and a mat, then click Run.
 
 import motor_pair
 import color_sensor
@@ -12,24 +12,24 @@ import runloop
 
 
 async def main():
-    motor_pair.pair(motor_pair.PAIR_1, port.A, port.B)
+    motor_pair.pair(motor_pair.PAIR_1, port.A, port.E)
 
-    # Avancer 2 s à 360 deg/s tout droit (steering=0)
+    # Drive straight 2 s at 360 deg/s (steering=0)
     await motor_pair.move_for_time(motor_pair.PAIR_1, 2000, 0, velocity=360)
 
-    # Pivoter à droite 0.8 s
+    # Pivot right 0.8 s
     await motor_pair.move_tank_for_time(motor_pair.PAIR_1, 800, 360, -360)
 
     motor_pair.stop(motor_pair.PAIR_1)
     light_matrix.write("OK")
-    print("Programme terminé")
+    print("Program finished")
 
 
 runloop.run(main())
 `;
 
 const SPIKE_COMPLETIONS = [
-  { label: 'motor_pair.pair', kind: 2, insertText: 'motor_pair.pair(motor_pair.PAIR_1, port.${1:A}, port.${2:B})', insertTextRules: 4 },
+  { label: 'motor_pair.pair', kind: 2, insertText: 'motor_pair.pair(motor_pair.PAIR_1, port.${1:A}, port.${2:E})', insertTextRules: 4 },
   { label: 'motor_pair.move_for_time', kind: 2, insertText: 'await motor_pair.move_for_time(motor_pair.PAIR_1, ${1:1000}, ${2:0}, velocity=${3:360})', insertTextRules: 4, detail: '(pair, duration_ms, steering, velocity)' },
   { label: 'motor_pair.move_for_degrees', kind: 2, insertText: 'await motor_pair.move_for_degrees(motor_pair.PAIR_1, ${1:360}, ${2:0}, velocity=${3:360})', insertTextRules: 4 },
   { label: 'motor_pair.move_tank_for_time', kind: 2, insertText: 'await motor_pair.move_tank_for_time(motor_pair.PAIR_1, ${1:1000}, ${2:360}, ${3:360})', insertTextRules: 4 },
@@ -40,7 +40,7 @@ const SPIKE_COMPLETIONS = [
   { label: 'motor.run_for_degrees', kind: 2, insertText: 'await motor.run_for_degrees(port.${1:A}, ${2:360}, ${3:360})', insertTextRules: 4 },
   { label: 'color_sensor.color', kind: 2, insertText: 'color_sensor.color(port.${1:C})', insertTextRules: 4 },
   { label: 'color_sensor.reflection', kind: 2, insertText: 'color_sensor.reflection(port.${1:C})', insertTextRules: 4 },
-  { label: 'distance_sensor.distance', kind: 2, insertText: 'distance_sensor.distance(port.${1:D})', insertTextRules: 4, detail: 'Distance en mm' },
+  { label: 'distance_sensor.distance', kind: 2, insertText: 'distance_sensor.distance(port.${1:D})', insertTextRules: 4, detail: 'Distance in mm' },
   { label: 'force_sensor.force', kind: 2, insertText: 'force_sensor.force(port.${1:E})', insertTextRules: 4 },
   { label: 'force_sensor.pressed', kind: 2, insertText: 'force_sensor.pressed(port.${1:E})', insertTextRules: 4 },
   { label: 'runloop.sleep_ms', kind: 2, insertText: 'await runloop.sleep_ms(${1:1000})', insertTextRules: 4 },
