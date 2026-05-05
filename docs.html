@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SPIKE Simulator — Help</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #1d2128;
+      --muted: #5b6371;
+      --panel: #f6f7f9;
+      --border: #e2e5ea;
+      --accent: #ec5ac8;
+      --code-bg: #1e2128;
+      --code-fg: #e6e9ef;
+      --kw:  #ff7eb6;
+      --fn:  #82cfff;
+      --num: #f0a500;
+      --str: #a4d181;
+      --com: #6c7686;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.55;
+    }
+    header.topbar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.8rem 1.4rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    header.topbar a.back { color: var(--fg); text-decoration: none; font-weight: 500; }
+    header.topbar a.back:hover { color: var(--accent); }
+    header.topbar h1 { margin: 0; font-size: 1.15rem; font-weight: 600; }
+    main { max-width: 1080px; margin: 0 auto; padding: 1.4rem; }
+
+    nav.toc {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.8rem 1.2rem;
+      margin-bottom: 1.6rem;
+    }
+    nav.toc h3 {
+      margin: 0 0 0.5rem;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+    }
+    nav.toc ol {
+      margin: 0.4rem 0 0;
+      padding-left: 1.4rem;
+      list-style: none;
+      column-count: 2;
+      column-gap: 1.6rem;
+    }
+    nav.toc li { break-inside: avoid; margin: 0.15rem 0; padding-left: 0.8rem; }
+    nav.toc a { color: var(--fg); text-decoration: none; }
+    nav.toc a:hover { color: var(--accent); }
+    nav.toc .group {
+      margin-top: 0.6rem;
+      padding-left: 0;
+    }
+    nav.toc .group a {
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    section.example {
+      margin: 0 0 2.4rem;
+      padding-top: 0.6rem;
+      scroll-margin-top: 4rem;
+    }
+    section.example h2 {
+      font-size: 1.2rem;
+      margin: 0 0 0.4rem;
+    }
+    section.example .lede {
+      color: var(--muted);
+      margin: 0 0 0.9rem;
+      max-width: 70ch;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 1.2rem;
+      align-items: start;
+    }
+    @media (max-width: 760px) {
+      .row { grid-template-columns: 1fr; }
+    }
+    pre.code {
+      background: var(--code-bg);
+      color: var(--code-fg);
+      padding: 0.85rem 1rem;
+      border-radius: 6px;
+      margin: 0;
+      overflow-x: auto;
+      font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+      font-size: 0.82rem;
+      line-height: 1.55;
+    }
+    pre.code .kw  { color: var(--kw); }
+    pre.code .fn  { color: var(--fn); }
+    pre.code .num { color: var(--num); }
+    pre.code .str { color: var(--str); }
+    pre.code .com { color: var(--com); font-style: italic; }
+    svg.diagram {
+      background: #fafbfc;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      display: block;
+    }
+    .note {
+      background: #fff8e6;
+      border-left: 3px solid #f0a500;
+      padding: 0.55rem 0.9rem;
+      margin: 0.7rem 0 0;
+      border-radius: 4px;
+      font-size: 0.92rem;
+      max-width: 70ch;
+    }
+    .note.danger {
+      background: #ffeef0;
+      border-left-color: #e74c3c;
+    }
+    h2.group-title {
+      margin: 2rem 0 0.6rem;
+      padding-top: 1rem;
+      border-top: 2px solid var(--border);
+      font-size: 1.4rem;
+      color: var(--accent);
+    }
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Shared SVG defs : robot facing +X with wheels on its sides (left wheel at -Y, right wheel at +Y). -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="robot">
+      <!-- main body -->
+      <rect x="-10" y="-9" width="20" height="18" rx="3" fill="#3f8eee" stroke="#1a4a8a" stroke-width="1"/>
+      <!-- forward chevron (points to +X) -->
+      <polygon points="13,0 6,-7 6,7" fill="#1a4a8a"/>
+      <!-- side wheels (circles → rotation-symmetric so they look static under any rotation) -->
+      <circle cx="-2" cy="-11" r="3.5" fill="#222"/>
+      <circle cx="-2" cy="11"  r="3.5" fill="#222"/>
+    </g>
+    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e6e8ec" stroke-width="0.5"/>
+    </pattern>
+    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#ec5ac8"/>
+    </marker>
+  </defs>
+</svg>
+
+<header class="topbar">
+  <a class="back" href="index.html">← Back to simulator</a>
+  <h1>Movement &amp; sensor examples</h1>
+</header>
+
+<main>
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li class="group"><a href="#movement">1. Movement</a></li>
+    <li><a href="#setup">1.1 Pair the drive motors</a></li>
+    <li><a href="#forward">1.2 Drive forward</a></li>
+    <li><a href="#backward">1.3 Drive backward</a></li>
+    <li><a href="#degrees">1.4 Drive a precise distance</a></li>
+    <li><a href="#steering">1.5 Curve while moving</a></li>
+    <li><a href="#pivot">1.6 Pivot in place</a></li>
+    <li><a href="#wheel">1.7 Pivot on one wheel</a></li>
+    <li><a href="#stop">1.8 Chain moves &amp; stop</a></li>
+    <li class="group"><a href="#color">2. Color sensor</a></li>
+    <li><a href="#color-wait">2.1 Stop on a colored line</a></li>
+    <li class="group"><a href="#gyroscope">3. Gyroscope</a></li>
+    <li><a href="#gyro-turn">3.1 Turn an exact angle</a></li>
+  </ol>
+</nav>
+
+
+<!-- ============================================================ -->
+<h2 class="group-title" id="movement">1. Movement</h2>
+
+<section class="example" id="setup">
+  <h2>1.1 Pair the drive motors</h2>
+  <p class="lede">Before driving, tell the program which two motors form the drive base. Always pair before any movement command. <strong>Pair only once per program!</strong></p>
+  <div class="row">
+    <pre class="code"><span class="kw">import</span> motor_pair
+<span class="kw">from</span> hub <span class="kw">import</span> port
+<span class="kw">import</span> runloop
+
+
+<span class="kw">async def</span> <span class="fn">main</span>():
+    motor_pair.<span class="fn">pair</span>(motor_pair.PAIR_1, port.A, port.E)
+
+
+runloop.<span class="fn">run</span>(<span class="fn">main</span>())</pre>
+    <svg class="diagram" width="240" height="180" viewBox="0 0 240 180">
+      <rect width="100%" height="100%" fill="url(#grid)" stroke="#ccc"/>
+      <use href="#robot" transform="translate(120 90) scale(1.5)"/>
+      <text x="120" y="46" text-anchor="middle" font-size="11" fill="#1a4a8a" font-weight="600">A — left</text>
+      <text x="120" y="148" text-anchor="middle" font-size="11" fill="#1a4a8a" font-weight="600">E — right</text>
+    </svg>
+  </div>
+  <div class="note">If A and E are swapped, the robot will turn the opposite way to what you expect — pair order matters.</div>
+</section>
+
+
+<section class="example" id="forward">
+  <h2>1.2 Drive forward</h2>
+  <p class="lede"><code>steering=0</code> means perfectly straight. Positive <code>velocity</code> = forward.</p>
+  <div class="row">
+    <pre class="code"><span class="kw">import</span> motor_pair
+<span class="kw">from</span> hub <span class="kw">import</span> port
+<span class="kw">import</span> runloop
+
+
+<span class="kw">async def</span> <span class="fn">main</span>():
+    motor_pair.<span class="fn">pair</span>(motor_pair.PAIR_1, port.A, port.E)
+    <span class="kw">await</span> motor_pair.<span class="fn">move_for_time</span>(motor_pair.PAIR_1, <span class="num">2000</span>, <span class="num">0</span>, velocity=<span class="num">400</span>)
+
+
+runloop.<span class="fn">run</span>(<span class="fn">main</span>())</pre>
+    <svg class="diagram" width="240" height="200" viewBox="0 0 240 200">
+      <rect width="100%" height="100%" fill="url(#grid)" stroke="#ccc"/>
+      <line x1="120" y1="170" x2="120" y2="30" stroke="#ec5ac8" stroke-width="2" opacity="0.3" stroke-dasharray="4 3"/>
+      <g>
+        <use href="#robot" transform="rotate(-90)"/>
+        <animateMotion dur="2s" repeatCount="indefinite" keyTimes="0;0.85;1" keyPoints="0;1;1" calcMode="linear" path="M 120,170 L 120,30"/>
+      </g>
+    </svg>
+  </div>
+  <div class="note"><code>2000</code> = duration in milliseconds (2 seconds). <code>velocity</code> is in degrees per second; 400 deg/s ≈ 35 cm/s on standard wheels.</div>
+</section>
+
+
+<section class="example" id="backward">
+  <h2>1.3 Drive backward</h2>
+  <p class="lede">Same command, but with a negative velocity. The robot keeps facing forward — it just rolls in reverse.</p>
+  <div class="row">
+    <pre class="code"><span class="kw">import</span> motor_pair
+<span class="kw">from</span> hub <span class="kw">import</span> port
+<span class="kw">import</span> runloop
+
+
+<span class="kw">async def</span> <span class="fn">main</span>():
+    motor_pair.<span class="fn">pair</span>(motor_pair.PAIR_1, port.A, port.E)
+    <span class="kw">await</span> motor_pair.<span class="fn">move_for_time</span>(motor_pair.PAIR_1, <span class="num">1500</span>, <span class="num">0</span>, velocity=-<span class="num">400</span>)
+
+
+runloop.<span class="fn">run</span>(<span class="fn">main</span>())</pre>
+    <svg class="diagram" width="240" height="200" viewBox="0 0 240 200">
+      <rect width="100%" height="100%" fill="url(#grid)" stroke="#ccc"/>
+      <line x1="120" y1="40" x2="120" y2="160" stroke="#ec5ac8" stroke-width="2" opacity="0.3" stroke-dasharray="4 3"/>
+      <g>
+        <use href="#robot" transform="rotate(-90)"/>
+        <animateMotion dur="2s" repeatCount="indefinite" keyTimes="0;0.85;1" keyPoints="0;1;1" calcMode="linear" path="M 120,40 L 120,160"/>
+      </g>
+    </svg>
+  </div>
+  <div class="note">Robot still <em>faces forward</em> (chevron up) but rolls in reverse — that's exactly what a real SPIKE robot does with negative velocity.</div>
+</section>
+
+
+<section class="example" id="degrees">
+  <h2>1.4 Drive a precise distance</h2>
+  <p class="lede">Use <code>move_for_degrees</code> when you need exact distance. The number is the wheel rotation in degrees — <strong>not</strong> centimeters.</p>
+  <div class="row">
+    <pre class="code"><span class="kw">import</span> motor_pair
+<span class="kw">from</span> hub <span class="kw">import</span> port
+<span class="kw">import</span> runloop
+
+
+<span class="kw">async def</span> <span class="fn">main</span>():
+    motor_pair.<span class="fn">pair</span>(motor_pair.PAIR_1, port.A, port.E)
+    <span class="com"># 720° = 2 full wheel turns ≈ 35 cm with standard wheels</span>
+    <span class="kw">await</span> motor_pair.<span class="fn">move_for_degrees</span>(motor_pair.PAIR_1, <span class="num">720</span>, <span class="num">0</span>, velocity=<span class="num">400</span>)
+
+
+runloop.<span class="fn">run</span>(<span class="fn">main</span>())</pre>
+    <svg class="diagram" width="280" height="220" viewBox="0 0 280 220">
+      <rect width="100%" height="100%" fill="url(#grid)" stroke="#ccc"/>
+      <!-- 360° robot on the left : moves 50 px (1 wheel rotation) -->
+      <line x1="80"  y1="180" x2="80"  y2="130" stroke="#ec5ac8" stroke-width="2" opacity="0.3" stroke-dasharray="4 3"/>
+      <text x="80"  y="206" text-anchor="middle" font-size="12" fill="#5b6371" font-weight="600">360°</text>
+      <text x="80"  y="220" text-anchor="middle" font-size="10" fill="#5b6371">(1 turn)</text>
+      <g>
+        <use href="#robot" transform="rotate(-90)"/>
+        <animateMotion dur="3s" repeatCount="indefinite" keyTimes="0;0.33;1" keyPoints="0;1;1" calcMode="linear" path="M 80,180 L 80,130"/>
+      </g>
+      <!-- 720° robot on the right : same speed, but goes twice as far (100 px in 2/3 of the cycle) -->
+      <line x1="200" y1="180" x2="200" y2="80"  stroke="#ec5ac8" stroke-width="2" opacity="0.3" stroke-dasharray="4 3"/>
+      <text x="200" y="206" text-anchor="middle" font-size="12" fill="#5b6371" font-weight="600">720°</text>
+      <text x="200" y="220" text-anchor="middle" font-size="10" fill="#5b6371">(2 turns = 2× further)</text>
+      <g>
+        <use href="#robot" transform="rotate(-90)"/>
+        <animateMotion dur="3s" repeatCount="indefinite" keyTimes="0;0.66;1" keyPoints="0;1;1" calcMode="linear" path="M 200,180 L 200,80"/>
+      </g>
+    </svg>
+  </div>
+  <div class="note">Same speed, but the 720° robot rolls for twice as long → it travels twice as far. To convert: 360° = 1 wheel turn = π × wheel diameter ≈ 17.6 cm with the standard SPIKE wheels (Ø 56 mm).</div>
+</section>
+
+
+<section class="example" id="steering">
+  <h2>1.5 Curve while moving</h2>
+  <p class="lede">The <code>steering</code> parameter (−100 to +100) bends the path. <strong>Negative = left</strong>, <strong>positive = right</strong>. ±100 stops the inside wheel completely → tightest curve.</p>
+  <div class="row">
+    <pre class="code"><span class="kw">import</span> motor_pair
+<span class="kw">from</span> hub <span class="kw">import</span> port
+<span class="kw">import</span> runloop
+
+
+<span class="kw">async def</span> <span class="fn">main</span>():
+    motor_pair.<span class="fn">pair</span>(motor_pair.PAIR_1, port.A, port.E)
+    <span class="com"># Try one of these — see the animation for what each does:</span>
+    <span class="com">#   -100 = sharp left   |   -50 = gentle left</span>
+    <span class="com">#    +50 = gentle right  |  +100 = sharp right</span>
+    <span class="kw">await</span> motor_pair.<span class="fn">move_for_time</span>(motor_pair.PAIR_1, <span class="num">2000</span>, <span class="num">50</span>, velocity=<span class="num">400</span>)
+
+
+runloop.<span class="fn">run</span>(<span class="fn">main</span>())</pre>
+    <svg class="diagram" width="480" height="240" viewBox="0 0 480 240">
+      <rect width="100%" height="100%" fill="url(#grid)" stroke="#ccc"/>
+      <!-- Heading labels -->
+      <text x="120" y="20" text-anchor="middle" font-size="12" fill="#5b6371" font-weight="600">left turns ←</text>
+      <text x="360" y="20" text-anchor="middle" font-size="12" fill="#5b6371" font-weight="600">→ right turns</text>
+      <line x1="240" y1="10" x2="240" y2="230" stroke="#ddd" stroke-width="1"/>
+
+      <!-- Pivot markers (red dots) and arc radius hints -->
+      <!-- ±100 : centre of rotation = the robot itself -->
+      <circle cx="60"  cy="120" r="3" fill="#e74c3c"/>
+      <circle cx="420" cy="120" r="3" fill="#e74c3c"/>
+      <!-- ±50 : centre of rotation is OUTSIDE the inner wheel, on the inside of the curve -->
+      <circle cx="180" cy="130" r="3" fill="#e74c3c"/>
+      <circle cx="180" cy="130" r="32" fill="none" stroke="#ec5ac8" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.4"/>
+      <circle cx="320" cy="130" r="3" fill="#e74c3c"/>
+      <circle cx="320" cy="130" r="32" fill="none" stroke="#ec5ac8" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.4"/>
+
+      <!-- −100 : robot spins 90° CCW around its own centre (no translation) -->
+      <g transform="translate(60 120)">
+        <use href="#robot" transform="rotate(-90)"/>
+        <animateTransform attributeName="transform" type="rotate" values="0;-90;-90" keyTimes="0;0.6;1" dur="3s" repeatCount="indefinite" additive="sum"/>
+      </g>
+
+      <!-- −50 : robot orbits a pivot 32 px to its left (well past the left wheel which is only 11 px out) -->
+      <g transform="translate(180 130)">
+        <use href="#robot" transform="translate(32 0) rotate(-90)"/>
+        <animateTransform attributeName="transform" type="rotate" values="0;-90;-90" keyTimes="0;0.6;1" dur="3s" repeatCount="indefinite" additive="sum"/>
+      </g>
+
+      <!-- +50 : symmetric — robot orbits a pivot 32 px to its right -->
+      <g transform="translate(320 130)">
+        <use href="#robot" transform="translate(-32 0) rotate(-90)"/>
+        <animateTransform attributeName="transform" type="rotate" values="0;90;90" keyTimes="0;0.6;1" dur="3s" repeatCount="indefinite" additive="sum"/>
+      </g>
+
+      <!-- +100 : robot spins 90° CW around its own centre (no translation) -->
+      <g transform="translate(420 120)">
+        <use href="#robot" transform="rotate(-90)"/>
+        <animateTransform attributeName="transform" type="rotate" values="0;90;90" keyTimes="0;0.6;1" dur="3s" repeatCount="indefinite" additive="sum"/>
+      </g>
+
+      <!-- Steering value labels -->
+      <text x="60"  y="200" text-anchor="middle" font-size="11" fill="#1a4a8a" font-weight="600">−100</text>
+      <text x="60"  y="214" text-anchor="middle" font-size="9"  fill="#5b6371">spin in place</text>
+      <text x="180" y="200" text-anchor="middle" font-size="11" fill="#1a4a8a" font-weight="600">−50</text>
+      <text x="180" y="214" text-anchor="middle" font-size="9"  fill="#5b6371">wide arc, pivot left</text>
+      <text x="320" y="200" text-anchor="middle" font-size="11" fill="#1a4a8a" font-weight="600">+50</text>
+      <text x="320" y="214" text-anchor="middle" font-size="9"  fill="#5b6371">wide arc, pivot right</text>
+      <text x="420" y="200" text-anchor="middle" font-size="11" fill="#1a4a8a" font-weight="600">+100</text>
+      <text x="420" y="214" text-anchor="middle" font-size="9"  fill="#5b6371">spin in place</text>
+    </svg>
+  </div>
+  <div class="note">±100 stops the inside wheel completely → the robot pivots tightly. ±50 keeps both wheels moving but at different speeds → wider curve. <code>0</code> = perfectly straight.</div>
+</section>
+
+
+<section class="example" id="pivot">
+  <h2>1.6 Pivot in place</h2>
+  <p class="lede"><code>move_tank</code> sets each wheel velocity directly. Equal but <em>opposite</em> velocities → the robot spins around its own center.</p>
+  <div class="row">
+    <pre class="code"><span class="kw">import</span> motor_pair
+<span class="kw">from</span> hub <span class="kw">import</span> port
+<span class="kw">import</span> runloop
+
+
+<span class="kw">async def</span> <span class="fn">main</span>():
+    motor_pair.<span class="fn">pair</span>(motor_pair.PAIR_1, port.A, port.E)
+    motor_pair.<span class="fn">move_tank</span>(motor_pair.PAIR_1, <span class="num">400</span>, -<span class="num">400</span>)
+    <span class="kw">await</span> runloop.<span class="fn">sleep_ms</span>(<span class="num">1000</span>)
+    motor_pair.<span class="fn">stop</span>(motor_pair.PAIR_1)
+
+
+runloop.<span class="fn">run</span>(<span class="fn">main</span>())</pre>
+    <svg class="diagram" width="220" height="200" viewBox="0 0 220 200">
+      <rect width="100%" height="100%" fill="url(#grid)" stroke="#ccc"/>
+      <circle cx="110" cy="100" r="40" fill="none" stroke="#ec5ac8" stroke-width="2" stroke-dasharray="4 3" opacity="0.4"/>
+      <g transform="translate(110 100)">
+        <use href="#robot"/>
+        <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="2.5s" repeatCount="indefinite" additive="sum"/>
+      </g>
+      <text x="110" y="180" text-anchor="middle" font-size="11" fill="#5b6371">spins around its center</text>
+    </svg>
+  </div>
+  <div class="note">Left wheel positive, right wheel negative → spin clockwise (viewed from above). Swap the signs for the opposite direction.</div>
+</section>
+
+
+<section class="example" id="wheel">
+  <h2>1.7 Pivot on one wheel</h2>
+  <p class="lede">Set one wheel velocity to <code>0</code> — the robot pivots around that wheel.</p>
+  <div class="row">
+    <pre class="code"><span class="kw">import</span> motor_pair
+<span class="kw">from</span> hub <span class="kw">import</span> port
+<span class="kw">import</span> runloop
+
+
+<span class="kw">async def</span> <span class="fn">main</span>():
+    motor_pair.<span class="fn">pair</span>(motor_pair.PAIR_1, port.A, port.E)
+    <span class="com"># Right wheel still, left wheel drives → pivot on right wheel</span>
+    motor_pair.<span class="fn">move_tank</span>(motor_pair.PAIR_1, <span class="num">400</span>, <span class="num">0</span>)
+    <span class="kw">await</span> runloop.<span class="fn">sleep_ms</span>(<span class="num">1500</span>)
+    motor_pair.<span class="fn">stop</span>(motor_pair.PAIR_1)
+
+
+runloop.<span class="fn">run</span>(<span class="fn">main</span>())</pre>
+    <svg class="diagram" width="260" height="220" viewBox="0 0 260 220">
+      <rect width="100%" height="100%" fill="url(#grid)" stroke="#ccc"/>
+      <!-- Trajectory traced by the body (left wheel) around the pivot, radius 22 -->
+      <circle cx="130" cy="110" r="22" fill="none" stroke="#ec5ac8" stroke-width="2" stroke-dasharray="4 3" opacity="0.4"/>
+      <!-- Static highlight ring on the still wheel (the actual pivot point) -->
+      <circle cx="130" cy="110" r="7" fill="none" stroke="#e74c3c" stroke-width="2"/>
+      <text x="130" y="86" text-anchor="middle" font-size="11" fill="#e74c3c" font-weight="600">right wheel = pivot</text>
+      <!-- Robot rotates around (130, 110). Right wheel of robot is at symbol coords (-2, 11),
+           so we offset the use by (+2, -11) so the right wheel ends up at the pivot at angle 0. -->
+      <g transform="translate(130 110)">
+        <use href="#robot" transform="translate(2 -11)"/>
+        <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="3.5s" repeatCount="indefinite" additive="sum"/>
+      </g>
+    </svg>
+  </div>
+  <div class="note">Same idea with left = 0 and right driven → robot pivots on the left wheel.</div>
+</section>
+
+
+<section class="example" id="stop">
+  <h2>1.8 Chain moves &amp; stop</h2>
+  <p class="lede">Blocking commands (<code>move_for_time</code>, <code>move_for_degrees</code>) finish on their own. Non-blocking ones (<code>move</code>, <code>move_tank</code>) keep going — always end your sequence with <code>motor_pair.stop()</code>.</p>
+  <div class="row">
+    <pre class="code"><span class="kw">import</span> motor_pair
+<span class="kw">from</span> hub <span class="kw">import</span> port
+<span class="kw">import</span> runloop
+
+
+<span class="kw">async def</span> <span class="fn">main</span>():
+    motor_pair.<span class="fn">pair</span>(motor_pair.PAIR_1, port.A, port.E)
+    <span class="kw">await</span> motor_pair.<span class="fn">move_for_time</span>(motor_pair.PAIR_1, <span class="num">1000</span>, <span class="num">0</span>, velocity=<span class="num">400</span>)
+    <span class="kw">await</span> motor_pair.<span class="fn">move_tank_for_time</span>(motor_pair.PAIR_1, <span class="num">600</span>, <span class="num">300</span>, -<span class="num">300</span>)
+    motor_pair.<span class="fn">stop</span>(motor_pair.PAIR_1)
+
+
+runloop.<span class="fn">run</span>(<span class="fn">main</span>())</pre>
+    <svg class="diagram" width="240" height="220" viewBox="0 0 240 220">
+      <rect width="100%" height="100%" fill="url(#grid)" stroke="#ccc"/>
+      <line x1="100" y1="180" x2="100" y2="100" stroke="#ec5ac8" stroke-width="2" opacity="0.3" stroke-dasharray="4 3"/>
+      <path d="M 100,100 A 22 22 0 0 1 122,78" fill="none" stroke="#ec5ac8" stroke-width="2" opacity="0.3" stroke-dasharray="4 3"/>
+      <g>
+        <use href="#robot"/>
+        <animateMotion dur="3.5s" repeatCount="indefinite" rotate="auto" keyTimes="0;0.45;0.75;0.9;1" keyPoints="0;0.6;1;1;1" calcMode="linear" path="M 100,180 L 100,100 A 22 22 0 0 1 122,78"/>
+      </g>
+    </svg>
+  </div>
+</section>
+
+
+<!-- ============================================================ -->
+<h2 class="group-title" id="color">2. Color sensor</h2>
+
+<section class="example" id="color-wait">
+  <h2>2.1 Stop on a colored line</h2>
+  <p class="lede">Drive forward, keep checking the sensor, stop the moment a red line is detected.</p>
+  <div class="row">
+    <pre class="code"><span class="kw">import</span> color
+<span class="kw">import</span> color_sensor
+<span class="kw">import</span> motor_pair
+<span class="kw">from</span> hub <span class="kw">import</span> port
+<span class="kw">import</span> runloop
+
+
+<span class="kw">async def</span> <span class="fn">main</span>():
+    motor_pair.<span class="fn">pair</span>(motor_pair.PAIR_1, port.A, port.E)
+    motor_pair.<span class="fn">move</span>(motor_pair.PAIR_1, <span class="num">0</span>, velocity=<span class="num">300</span>)
+    <span class="kw">while</span> color_sensor.<span class="fn">color</span>(port.B) != color.RED:
+        <span class="kw">pass</span>
+    motor_pair.<span class="fn">stop</span>(motor_pair.PAIR_1)
+
+
+runloop.<span class="fn">run</span>(<span class="fn">main</span>())</pre>
+    <svg class="diagram" width="240" height="220" viewBox="0 0 240 220">
+      <rect width="100%" height="100%" fill="url(#grid)" stroke="#ccc"/>
+      <rect x="20" y="70" width="200" height="14" fill="#e74c3c"/>
+      <text x="225" y="64" font-size="10" fill="#a52a2a" text-anchor="end" font-weight="600">red line</text>
+      <g>
+        <use href="#robot" transform="rotate(-90)"/>
+        <animateMotion dur="3s" repeatCount="indefinite" keyTimes="0;0.7;1" keyPoints="0;1;1" calcMode="linear" path="M 120,190 L 120,90"/>
+      </g>
+    </svg>
+  </div>
+  <div class="note">The <code>while</code> loop keeps spinning until the condition becomes false. Each iteration takes a few ms because reading the sensor talks to the hub over Bluetooth.</div>
+</section>
+
+
+<!-- ============================================================ -->
+<h2 class="group-title" id="gyroscope">3. Gyroscope</h2>
+
+<section class="example" id="gyro-turn">
+  <h2>3.1 Turn an exact angle</h2>
+  <p class="lede">Reset the yaw to 0 right before turning so you measure from a known starting point. Then drive in one direction until the yaw reaches the target. The angle is in <strong>deci-degrees</strong> — to turn 90° you wait until <code>tilt_angles()[0]</code> reaches <strong>900</strong>.</p>
+  <div class="row">
+    <pre class="code"><span class="kw">from</span> hub <span class="kw">import</span> motion_sensor, port
+<span class="kw">import</span> motor_pair
+<span class="kw">import</span> runloop
+
+
+<span class="kw">async def</span> <span class="fn">main</span>():
+    motor_pair.<span class="fn">pair</span>(motor_pair.PAIR_1, port.A, port.E)
+    motion_sensor.<span class="fn">reset_yaw</span>(<span class="num">0</span>)
+    motor_pair.<span class="fn">move</span>(motor_pair.PAIR_1, -<span class="num">100</span>, velocity=<span class="num">200</span>)
+    <span class="kw">while</span> motion_sensor.<span class="fn">tilt_angles</span>()[<span class="num">0</span>] &lt; <span class="num">900</span>:
+        <span class="kw">pass</span>
+    motor_pair.<span class="fn">stop</span>(motor_pair.PAIR_1)
+
+
+runloop.<span class="fn">run</span>(<span class="fn">main</span>())</pre>
+    <svg class="diagram" width="220" height="200" viewBox="0 0 220 200">
+      <rect width="100%" height="100%" fill="url(#grid)" stroke="#ccc"/>
+      <path d="M 110,100 L 110,40" stroke="#888" stroke-width="1" stroke-dasharray="3 2"/>
+      <path d="M 110,100 L 50,100" stroke="#ec5ac8" stroke-width="1.5" stroke-dasharray="3 2"/>
+      <path d="M 110,55 A 45 45 0 0 0 65,100" fill="none" stroke="#ec5ac8" stroke-width="2" marker-end="url(#arr)"/>
+      <text x="76" y="60" font-size="11" fill="#ec5ac8" font-weight="600">+90°</text>
+      <!-- Robot rotates from -90 (up) to -180 (left), holds, then SNAPS back to -90 -->
+      <g transform="translate(110 100)">
+        <use href="#robot"/>
+        <animateTransform attributeName="transform" type="rotate" values="-90;-180;-180" keyTimes="0;0.5;1" dur="3s" repeatCount="indefinite" additive="sum"/>
+      </g>
+    </svg>
+  </div>
+  <div class="note"><strong>Convention</strong>: in our simulator, turning <em>left</em> increases the yaw (positive); turning <em>right</em> decreases it. To turn 90° to the right, use <code>steering=+100</code> and wait for <code>yaw &lt; -900</code>.</div>
+</section>
+
+
+</main>
+
+<footer>
+  Open the simulator, load a robot and a mat, then paste any example into the Python tab to try it.
+</footer>
+
+</body>
+</html>

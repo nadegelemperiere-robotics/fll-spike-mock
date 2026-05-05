@@ -1492,17 +1492,19 @@ function styleProcedureBlocks() {
     };
   }
 
-  // Mutator container : on enlève le DummyInput "STATEMENT_INPUT" (case à
-  // cocher "autoriser les ordres") qui n'a pas de sens chez nous puisque
-  // les procédures ont toujours un corps.
+  // Mutator container : on cache la case à cocher "allow statements" qui n'a
+  // pas de sens chez nous (le corps est toujours là). On garde l'init
+  // d'origine pour préserver le setup interne de Blockly (style, tooltip,
+  // wiring du bubble). Sans ça, l'icône d'engrenage n'attrape plus le clic
+  // et c'est le bloc parent qui se met à suivre la souris.
   const mc = Blockly.Blocks['procedures_mutatorcontainer'];
-  if (mc) {
+  if (mc && mc.init) {
+    const origMcInit = mc.init;
     mc.init = function() {
-      this.appendDummyInput()
-        .appendField(Blockly.Msg['PROCEDURES_MUTATORCONTAINER_TITLE'] || 'inputs');
-      this.appendStatementInput('STACK');
+      origMcInit.call(this);
       this.setColour(C.myblocks);
-      this.contextMenu = false;
+      const stmtInput = this.getInput('STATEMENT_INPUT');
+      if (stmtInput) stmtInput.setVisible(false);
     };
   }
 
