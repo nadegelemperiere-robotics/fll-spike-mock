@@ -162,10 +162,12 @@ function updateSensorReadout(state) {
     el.innerHTML = '<div class="sensor-line"><span>—</span><span class="v">aucun robot</span></div>';
     return;
   }
-  // Calcule (yaw, pitch, roll) en degrés selon hub.motion_sensor.tilt_angles().
+  // Calcule (yaw, pitch, roll) en degrés selon la convention blocs SPIKE
+  // (tour droite = positif). La convention Python officielle est l'inverse,
+  // mais l'UI est calée sur la convention blocs pour rester intuitive.
   // Notre sim 2D ne fait tourner que l'axe TOP-BOTTOM ; selon yaw_face, la
   // valeur tombe sur yaw, pitch ou roll.
-  const tbRaw = -state.robotState.heading - (state.motion?.tbOffsetRad || 0);
+  const tbRaw = -state.robotState.heading + (state.motion?.tbOffsetRad || 0);
   const tbDeg = Math.atan2(Math.sin(tbRaw), Math.cos(tbRaw)) * 180 / Math.PI;
   const yawFace = state.motion?.yawFace || 0;
   let yawDeg = 0, pitchDeg = 0, rollDeg = 0;

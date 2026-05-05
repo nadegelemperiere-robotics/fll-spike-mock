@@ -1287,9 +1287,13 @@ function defineBlocks() {
 
   P.sensor_tilt_angle = b => {
     // tilt_angles() retourne (yaw, pitch, roll) en déci-degrés (SPIKE 3 :
-    // 900 = 90°). Côté blocs on travaille en degrés, donc on divise par 10.
+    // 900 = 90°). Côté blocs on travaille en degrés ET on inverse le signe
+    // par rapport à Python : convention Scratch / SPIKE blocks veut que
+    // tour droite = yaw positif (alors que Python officiel donne tour gauche
+    // = positif). On compense ici pour que les blocs gardent leur ressenti
+    // habituel.
     const idx = { YAW: 0, PITCH: 1, ROLL: 2 }[b.getFieldValue('AXIS')] || 0;
-    return [`(motion_sensor.tilt_angles()[${idx}] / 10)`, P.ORDER_MULTIPLICATIVE];
+    return [`(-motion_sensor.tilt_angles()[${idx}] / 10)`, P.ORDER_MULTIPLICATIVE];
   };
 
   P.sensor_button_pressed = b => {

@@ -193,8 +193,11 @@ class _MotionSensor:
 
     def _tb_rotation_rad(self):
         """Rotation cumulée autour de l'axe TOP-BOTTOM (avec offset),
-        normalisée dans [-π, π]. Convention SPIKE : positif = horaire vu de dessus."""
-        rad = -_b.getHeading() - self._tb_offset_rad
+        normalisée dans [-π, π]. Convention SPIKE Python officielle :
+        yaw augmente sur tour gauche (CCW vu de dessus) — donc le yaw
+        diminue sur tour droite. Côté blocs Scratch/SPIKE, on inverse
+        ce signe (cf. générateur sensor_tilt_angle dans blockly-config.js)."""
+        rad = _b.getHeading() - self._tb_offset_rad
         return math.atan2(math.sin(rad), math.cos(rad))
 
     def acceleration(self, raw_unfiltered=False):
@@ -222,8 +225,9 @@ class _MotionSensor:
     def angular_velocity(self):
         """Vitesse angulaire (yaw_rate, pitch_rate, roll_rate) en décidegrés/s.
         Robot à plat : seul l'axe vertical bouge ; la face active détermine
-        sur quelle composante elle apparaît."""
-        omega_rad_s = -_b.getAngularVelocity()
+        sur quelle composante elle apparaît. Même convention que tilt_angles
+        (yaw_rate > 0 sur tour gauche)."""
+        omega_rad_s = _b.getAngularVelocity()
         rate_dds = int(omega_rad_s * 180 / math.pi * 10)
         return self._route_to_axes(rate_dds)
 
@@ -255,12 +259,14 @@ class _MotionSensor:
         (les autres faces ont un yaw structurellement nul)."""
         target_rad = angle * math.pi / 180
         if self._yaw_face == self.TOP:
-            self._tb_offset_rad = -_b.getHeading() - target_rad
+            # tb_rotation = heading - offset → on veut tb_rotation == target_rad
+            # à l'instant t, donc offset = heading - target_rad.
+            self._tb_offset_rad = _b.getHeading() - target_rad
             _b.setMotionTBOffset(self._tb_offset_rad)
         elif self._yaw_face == self.BOTTOM:
             # BOTTOM inverse le signe : tilt_angles[0] = -tb_rotation
             # On veut tilt_angles[0] == target_rad, donc tb_rotation == -target_rad.
-            self._tb_offset_rad = -_b.getHeading() + target_rad
+            self._tb_offset_rad = _b.getHeading() + target_rad
             _b.setMotionTBOffset(self._tb_offset_rad)
         # Pour FRONT/BACK/LEFT/RIGHT : l'axe yaw n'a pas de rotation à reset,
         # et le roll/pitch (qui contient la rotation TOP-BOTTOM) ne doit pas
