@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SPIKE Simulator — App guide</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #1d2128;
+      --muted: #5b6371;
+      --panel: #f6f7f9;
+      --border: #e2e5ea;
+      --accent: #ec5ac8;
+      --accent-2: #3f8eee;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.6;
+    }
+    header.topbar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.8rem 1.4rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    header.topbar a { color: var(--fg); text-decoration: none; font-weight: 500; }
+    header.topbar a:hover { color: var(--accent); }
+    header.topbar h1 { margin: 0; font-size: 1.15rem; font-weight: 600; }
+    header.topbar .spacer { flex: 1; }
+    main { max-width: 980px; margin: 0 auto; padding: 1.6rem; }
+
+    h2 { margin: 2rem 0 0.6rem; font-size: 1.3rem; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+    h3 { margin: 1.4rem 0 0.4rem; font-size: 1.05rem; }
+    p { margin: 0.4rem 0 0.7rem; }
+    p.lede { color: var(--muted); }
+    ul { margin: 0.4rem 0 0.7rem; padding-left: 1.4rem; }
+    li { margin: 0.3rem 0; }
+
+    /* Inline button-like badge for referencing UI buttons */
+    .btn-ref {
+      display: inline-block;
+      padding: 0.1rem 0.55rem;
+      border-radius: 5px;
+      background: #2d3540;
+      color: #fff;
+      font-size: 0.85rem;
+      font-weight: 600;
+      vertical-align: middle;
+      letter-spacing: 0.2px;
+      white-space: nowrap;
+    }
+    .btn-ref.primary { background: var(--accent); }
+    .btn-ref.alt { background: var(--accent-2); }
+    .btn-ref.warn { background: #f0a500; color: #2d2300; }
+
+    .key {
+      display: inline-block;
+      padding: 0.05rem 0.45rem;
+      border: 1px solid #bbb;
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      background: #fafafa;
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 0.82rem;
+      vertical-align: middle;
+    }
+
+    .tip {
+      background: #eef7ff;
+      border-left: 3px solid var(--accent-2);
+      padding: 0.6rem 0.9rem;
+      margin: 0.7rem 0;
+      border-radius: 4px;
+      font-size: 0.95rem;
+    }
+    .warn {
+      background: #fff8e6;
+      border-left: 3px solid #f0a500;
+      padding: 0.6rem 0.9rem;
+      margin: 0.7rem 0;
+      border-radius: 4px;
+      font-size: 0.95rem;
+    }
+
+    .layout-diagram {
+      display: block;
+      margin: 1rem auto;
+      max-width: 100%;
+      background: #fafbfc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    nav.toc {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.8rem 1.2rem;
+      margin-bottom: 1.6rem;
+    }
+    nav.toc h3 { margin: 0 0 0.5rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+    nav.toc ol { margin: 0.4rem 0 0; padding-left: 1.4rem; }
+    nav.toc a { color: var(--fg); text-decoration: none; }
+    nav.toc a:hover { color: var(--accent); }
+
+    table.button-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.6rem 0 0.8rem;
+    }
+    table.button-table th, table.button-table td {
+      padding: 0.5rem 0.7rem;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+    table.button-table th {
+      background: var(--panel);
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    table.button-table td:first-child { white-space: nowrap; width: 1%; }
+
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="index.html">← Back to simulator</a>
+  <h1>App guide</h1>
+  <span class="spacer"></span>
+  <a href="docs.html">Code examples →</a>
+</header>
+
+<main>
+
+<p class="lede">A quick tour of the simulator window: the toolbar at the top, the editor on the left, the 3D mat on the right, and the console at the bottom. This page covers <strong>how to use the app</strong>; for example programs go to the <a href="docs.html">code examples</a>.</p>
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#layout">1. The layout at a glance</a></li>
+    <li><a href="#pick">2. Picking a robot and a mat</a></li>
+    <li><a href="#buttons">3. The action buttons</a></li>
+    <li><a href="#editor">4. The editor: Blocks vs Python</a></li>
+    <li><a href="#robot">5. Repositioning the robot</a></li>
+    <li><a href="#hub">6. The hub display</a></li>
+    <li><a href="#console">7. The console</a></li>
+    <li><a href="#workflow">8. Typical workflow</a></li>
+  </ol>
+</nav>
+
+
+<!-- =================================================================== -->
+<h2 id="layout">1. The layout at a glance</h2>
+
+<svg class="layout-diagram" viewBox="0 0 720 360" width="720" height="360">
+  <!-- Top toolbar -->
+  <rect x="10" y="10" width="700" height="40" fill="#f6f7f9" stroke="#bbb"/>
+  <text x="20" y="34" font-size="13" font-weight="700">SPIKE Prime Simulator</text>
+  <rect x="200" y="18" width="80" height="24" rx="4" fill="#fff" stroke="#bbb"/>
+  <text x="240" y="34" font-size="11" text-anchor="middle">Robot ▾</text>
+  <rect x="290" y="18" width="80" height="24" rx="4" fill="#fff" stroke="#bbb"/>
+  <text x="330" y="34" font-size="11" text-anchor="middle">Mat ▾</text>
+  <rect x="380" y="18" width="60" height="24" rx="4" fill="#ec5ac8"/>
+  <text x="410" y="34" font-size="11" text-anchor="middle" fill="#fff" font-weight="600">▶ Run</text>
+  <rect x="446" y="18" width="48" height="24" rx="4" fill="#2d3540"/>
+  <text x="470" y="34" font-size="11" text-anchor="middle" fill="#fff">■ Stop</text>
+  <rect x="500" y="18" width="56" height="24" rx="4" fill="#2d3540"/>
+  <text x="528" y="34" font-size="11" text-anchor="middle" fill="#fff">⟲ Reset</text>
+  <rect x="562" y="18" width="50" height="24" rx="4" fill="#2d3540"/>
+  <text x="587" y="34" font-size="10" text-anchor="middle" fill="#fff">📂 Load</text>
+  <rect x="618" y="18" width="50" height="24" rx="4" fill="#2d3540"/>
+  <text x="643" y="34" font-size="10" text-anchor="middle" fill="#fff">💾 Save</text>
+  <rect x="674" y="18" width="32" height="24" rx="4" fill="#2d3540"/>
+  <text x="690" y="34" font-size="10" text-anchor="middle" fill="#fff">📖</text>
+
+  <!-- Editor panel -->
+  <rect x="10" y="60" width="280" height="200" fill="#fff" stroke="#bbb"/>
+  <rect x="10" y="60" width="80" height="22" fill="#ec5ac8"/>
+  <text x="50" y="76" font-size="11" text-anchor="middle" fill="#fff" font-weight="600">🧩 Blocks</text>
+  <rect x="90" y="60" width="80" height="22" fill="#fff" stroke="#bbb" stroke-width="0"/>
+  <text x="130" y="76" font-size="11" text-anchor="middle" fill="#444">🐍 Python</text>
+  <rect x="20" y="100" width="120" height="14" rx="3" fill="#edc643"/>
+  <rect x="20" y="125" width="180" height="14" rx="3" fill="#3f8eee"/>
+  <rect x="20" y="150" width="180" height="14" rx="3" fill="#3f8eee"/>
+  <rect x="20" y="175" width="160" height="14" rx="3" fill="#ec5ac8"/>
+  <text x="150" y="248" text-anchor="middle" font-size="11" fill="#5b6371" font-style="italic">editor</text>
+
+  <!-- Sim panel -->
+  <rect x="295" y="60" width="415" height="200" fill="#0a0d11" stroke="#bbb"/>
+  <text x="305" y="78" fill="#aaa" font-size="10">advanced-base · demo-mat · Ready</text>
+  <rect x="320" y="105" width="370" height="120" fill="#bccede"/>
+  <rect x="490" y="155" width="30" height="22" fill="#3f8eee" stroke="#1a4a8a"/>
+  <polygon points="500,142 495,150 515,150" fill="#1a4a8a"/>
+  <text x="505" y="190" text-anchor="middle" font-size="10" fill="#222">robot</text>
+  <rect x="610" y="68" width="80" height="50" fill="#222" stroke="#444"/>
+  <text x="650" y="98" text-anchor="middle" fill="#fff" font-size="9">hub display</text>
+  <text x="500" y="248" text-anchor="middle" font-size="11" fill="#5b6371" font-style="italic">3D simulator (top-down)</text>
+
+  <!-- Console -->
+  <rect x="10" y="270" width="700" height="80" fill="#1e2128" stroke="#bbb"/>
+  <text x="20" y="290" fill="#a4d181" font-size="10" font-family="Consolas, monospace">[12:34:01] info  Loading mat advanced-base.io…</text>
+  <text x="20" y="306" fill="#82cfff" font-size="10" font-family="Consolas, monospace">[12:34:02] ok    Robot loaded.</text>
+  <text x="20" y="322" fill="#a4d181" font-size="10" font-family="Consolas, monospace">[12:34:05] log   Hello from the program</text>
+  <text x="20" y="342" fill="#888" font-size="10" font-family="Consolas, monospace">▸ console output</text>
+</svg>
+
+<p>The screen has four areas:</p>
+<ul>
+  <li><strong>Top toolbar</strong> — robot &amp; mat selectors and the action buttons.</li>
+  <li><strong>Editor (left)</strong> — two tabs: <em>Blocks</em> and <em>Python</em>. Independent — the Python tab is <strong>not</strong> a live view of the blocks.</li>
+  <li><strong>3D simulator (right)</strong> — a top-down view of the mat with the robot. Above the mat: the hub display (5×5 matrix, side buttons). On the mat: a small live readout of every sensor.</li>
+  <li><strong>Console (bottom)</strong> — every <code>print()</code> call from your program, plus info and error messages.</li>
+</ul>
+
+
+<!-- =================================================================== -->
+<h2 id="pick">2. Picking a robot and a mat</h2>
+
+<p>Use the two dropdowns at the top of the toolbar:</p>
+<ul>
+  <li><strong>Robot</strong> — picks a built robot model. The wheels, motors and sensors are loaded automatically; you cannot change them from inside the app.</li>
+  <li><strong>Mat</strong> — picks a printed mat (FLL field, demo grid, etc.). The mat fills the floor of the simulator; the robot's color sensor reads pixels from this image.</li>
+</ul>
+<p>Your last choice is remembered for the next time you open the page.</p>
+
+
+<!-- =================================================================== -->
+<h2 id="buttons">3. The action buttons</h2>
+
+<table class="button-table">
+  <thead>
+    <tr><th>Button</th><th>What it does</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="btn-ref primary">▶ Run</span></td>
+      <td>Runs the program from the active editor tab. The robot starts moving on the mat. The button stays green; the status next to the robot/mat name changes to <em>Running…</em>.</td>
+    </tr>
+    <tr>
+      <td><span class="btn-ref">■ Stop</span></td>
+      <td>Stops the program <strong>and</strong> stops every motor. Use this when the robot does something you didn't expect — you don't have to wait for the program to finish on its own.</td>
+    </tr>
+    <tr>
+      <td><span class="btn-ref">⟲ Reset</span></td>
+      <td>Sends the robot back to its starting position on the mat and clears the hub display. Does <em>not</em> change the program — your code stays untouched.</td>
+    </tr>
+    <tr>
+      <td><span class="btn-ref">📂 Load</span></td>
+      <td>Opens a file picker. Pick a <code>.py</code> file → loaded into the Python tab. Pick a <code>.xml</code> file → loaded into the Blocks tab. The active tab switches automatically.</td>
+    </tr>
+    <tr>
+      <td><span class="btn-ref">💾 Save</span></td>
+      <td>Saves the content of the <strong>active tab</strong>. From the Blocks tab you get a <code>.xml</code> file; from the Python tab you get a <code>.py</code> file. You can choose the file name.</td>
+    </tr>
+    <tr>
+      <td><span class="btn-ref">📖 Help</span></td>
+      <td>Opens the <a href="docs.html">code examples page</a> (movement, color sensor, gyroscope) in a new tab.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="warn"><strong>Run vs Reset</strong>: Run launches the program; Reset just teleports the robot back to its start. If you want to <em>stop</em> the program use <span class="btn-ref">■ Stop</span>, then Reset to put the robot back where it started.</div>
+
+
+<!-- =================================================================== -->
+<h2 id="editor">4. The editor: Blocks vs Python</h2>
+
+<p>The editor has two tabs. They are <strong>independent editors</strong>:</p>
+<ul>
+  <li><span class="btn-ref alt">🧩 Blocks</span> — drag &amp; drop blocks from the left palette onto the workspace. Blocks generate Python automatically when you click Run.</li>
+  <li><span class="btn-ref alt">🐍 Python</span> — type Python code directly. Anything you type stays in this tab, even if you switch to Blocks and back.</li>
+</ul>
+
+<p>Switching tabs <strong>does not copy</strong> code from one to the other. The Run button uses whichever tab is currently active.</p>
+
+<div class="tip"><strong>Variables &amp; Lists</strong>: in the Blocks palette, <em>My Blocks</em> lets you create your own functions; <em>Variables</em> lets you create simple variables and named lists.</div>
+
+
+<!-- =================================================================== -->
+<h2 id="robot">5. Repositioning the robot</h2>
+
+<p>You can put the robot anywhere on the mat <em>before</em> running the program:</p>
+<ul>
+  <li><strong>Drag</strong> the robot with the mouse → moves it on the mat.</li>
+  <li><span class="key">Shift</span> + drag → rotates the robot in place.</li>
+</ul>
+<p>The new pose becomes the robot's <em>start pose</em>. <span class="btn-ref">⟲ Reset</span> always returns the robot to this start pose, not to the original mat default.</p>
+
+<div class="warn">On a Chromebook, <span class="key">Alt</span>+click is intercepted by the system — that's why we use <span class="key">Shift</span> for rotation.</div>
+
+
+<!-- =================================================================== -->
+<h2 id="hub">6. The hub display</h2>
+
+<p>Above the mat, the hub display mirrors what your program does to the real hub:</p>
+<ul>
+  <li><strong>5×5 matrix</strong> — every <code>light_matrix.set_pixel(x, y, intensity)</code> call lights one of the 25 pixels. <code>light_matrix.write("Hi")</code> scrolls text. <code>light_matrix.show_image(...)</code> shows one of the built-in icons.</li>
+  <li><strong>Power button</strong> (centre, between L and R) — its colour changes when your program calls <code>light.color(light.POWER, color.RED)</code>.</li>
+  <li><strong>Bluetooth ring</strong> (right-most) — same idea with <code>light.CONNECT</code>.</li>
+  <li><strong>L &nbsp;/ &nbsp;R buttons</strong> — click or hold them; the program reads the press time via <code>button.pressed(button.LEFT)</code>.</li>
+</ul>
+
+
+<!-- =================================================================== -->
+<h2 id="console">7. The console</h2>
+
+<p>The black panel at the bottom shows three kinds of lines:</p>
+<ul>
+  <li><span style="color:#82cfff;font-weight:600">info / ok</span> — what the simulator is doing (loading a mat, Pyodide ready, …).</li>
+  <li><span style="color:#a4d181;font-weight:600">log</span> — anything you <code>print()</code> from your program.</li>
+  <li><span style="color:#e74c3c;font-weight:600">err</span> — Python errors (with the line number and the type of error).</li>
+</ul>
+<p>The <strong>Clear</strong> button at the top-right of the console wipes it. The console is <em>per-session</em> — it disappears when you reload the page.</p>
+
+
+<!-- =================================================================== -->
+<h2 id="workflow">8. Typical workflow</h2>
+
+<ol>
+  <li>Pick a <strong>Robot</strong> and a <strong>Mat</strong> from the toolbar.</li>
+  <li><em>(optional)</em> Drag the robot to the start position you want.</li>
+  <li>Build a program in the <span class="btn-ref alt">🧩 Blocks</span> tab, or write Python in the <span class="btn-ref alt">🐍 Python</span> tab.</li>
+  <li>Click <span class="btn-ref primary">▶ Run</span> and watch the robot move.</li>
+  <li>Something wrong? <span class="btn-ref">■ Stop</span>, then <span class="btn-ref">⟲ Reset</span>, fix the code, Run again.</li>
+  <li>When you're done: <span class="btn-ref">💾 Save</span> to keep your work as a file, or just close the tab — the simulator remembers your last code automatically.</li>
+</ol>
+
+<div class="tip">Ready to write your first program? Open the <a href="docs.html">code examples</a> for ready-to-paste snippets.</div>
+
+</main>
+
+<footer>
+  Stuck? Use <span class="btn-ref">■ Stop</span> to halt the program, <span class="btn-ref">⟲ Reset</span> to put the robot back, then try again.
+</footer>
+
+</body>
+</html>
