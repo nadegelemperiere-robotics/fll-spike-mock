@@ -1,7 +1,9 @@
 /*! coi-serviceworker v0.1.7 — MIT, Guido Zuidhof & contributors.
     Active COOP/COEP côté client pour rendre SharedArrayBuffer disponible
-    (nécessaire à Pyodide.setInterruptBuffer pour interrompre du Python pur). */
-let coepCredentialless = false;
+    (nécessaire à Pyodide.setInterruptBuffer pour interrompre du Python pur).
+    Mode credentialless par défaut : on n'exige pas que les ressources
+    cross-origin (icônes, mats…) renvoient un en-tête CORP. */
+let coepCredentialless = true;
 
 if (typeof window === 'undefined') {
   // --- Côté Service Worker ---
@@ -49,7 +51,9 @@ if (typeof window === 'undefined') {
     const coi = {
       shouldRegister: () => !reloadedBySelf,
       shouldDeregister: () => false,
-      coepCredentialless: () => false,
+      coepCredentialless: () => true,   // mode credentialless : pas besoin que les
+                                         // ressources cross-origin (icônes, mats…)
+                                         // renvoient un en-tête CORP.
       coepDegrade: () => true,
       doReload: () => window.location.reload(),
       quiet: false,

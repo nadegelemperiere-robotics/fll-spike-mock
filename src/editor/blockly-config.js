@@ -1569,7 +1569,20 @@ export function setupBlockly(container) {
     toolbox: TOOLBOX,
     theme: Blockly.Themes.Dark,
     grid: { spacing: 20, length: 1, colour: '#2d3540', snap: true },
-    zoom: { controls: true, wheel: true, startScale: 1.0 },
+    zoom: {
+      controls: true,    // boutons +/−/reset en bas à droite du workspace
+      wheel: true,       // zoom à la molette (sans Ctrl)
+      startScale: 1.0,
+      maxScale: 3,
+      minScale: 0.3,
+      scaleSpeed: 1.2,   // 20 % par cran
+      pinch: true,       // pinch-to-zoom sur écrans tactiles
+    },
+    move: {
+      scrollbars: true,
+      drag: true,
+      wheel: false,      // wheel = zoom (cf zoom.wheel ci-dessus), pas scroll
+    },
     trashcan: true,
     renderer: 'zelos',  // rendu rond style SPIKE/Scratch
   });

@@ -103,14 +103,14 @@ function readSession() {
   }
 }
 
-// Onglets éditeur
+// Onglets éditeur — l'onglet Python est un éditeur indépendant : pas de sync
+// automatique depuis les blocs (le code généré tourne en interne au Run).
 document.querySelectorAll('.tab').forEach(tab => {
   tab.onclick = () => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
     tab.classList.add('active');
     document.getElementById('tab-' + tab.dataset.tab).classList.remove('hidden');
-    if (tab.dataset.tab === 'python') syncBlocksToPython();
   };
 });
 
@@ -210,10 +210,6 @@ document.getElementById('reset-btn').onclick = () => {
 const blocklyWorkspace = setupBlockly(document.getElementById('blockly-area'));
 const monaco = await setupMonaco(document.getElementById('monaco-area'));
 
-// Affichage du Python généré dans l'onglet Python.
-// Mettre à false pour cacher le code généré (l'onglet Python devient un éditeur indépendant).
-const SHOW_GENERATED_PYTHON = true;
-
 function generatePythonFromBlocks() {
   try {
     return Blockly.Python.workspaceToCode(blocklyWorkspace);
@@ -223,12 +219,8 @@ function generatePythonFromBlocks() {
   }
 }
 
-function syncBlocksToPython() {
-  if (!SHOW_GENERATED_PYTHON) return;
-  monaco.setValue(generatePythonFromBlocks());
-}
-
-// Source active : blocs (régénérée à la volée) ou Python (Monaco)
+// Source active : blocs (régénération à la volée, jamais affichée à l'utilisateur)
+// ou Python (contenu de Monaco, indépendant des blocs).
 function getActiveCode() {
   const blocksTab = document.querySelector('.tab[data-tab="blocks"]');
   if (blocksTab?.classList.contains('active')) {
