@@ -207,7 +207,7 @@ const TOOLBOX = {
         tb('movement_move_dir_for',           { N: 10 }),
         tb('movement_move_steer_for',         { STEER: 0, N: 10 }),
         tb('movement_start_dir'),
-        tb('movement_start_steer',            { STEER: 0 }),
+        tb('movement_start_steer'),
         tb('movement_stop'),
         tb('movement_set_motors'),
         tb('movement_set_speed',              { PCT: 50 }),
@@ -430,6 +430,24 @@ function wrapEventCoro(P, block, funcName, body) {
 
 
 function defineBlocks() {
+  // Champ custom : un FieldNumber qui se rend dans le bloc avec un préfixe
+  // dynamique « straight : », « left : » ou « right : » selon le signe.
+  // Le préfixe est dans la zone blanche du champ ; à l'édition, on saisit
+  // juste le nombre.
+  if (!Blockly._steerFieldRegistered) {
+    class FieldSteer extends Blockly.FieldNumber {
+      getDisplayText_() {
+        const v = Number(this.value_) || 0;
+        let prefix = 'straight :';
+        if (v < 0)      prefix = 'left :';
+        else if (v > 0) prefix = 'right :';
+        return `${prefix} ${v}`;
+      }
+    }
+    Blockly.fieldRegistry.register('field_steer', FieldSteer);
+    Blockly._steerFieldRegistered = true;
+  }
+
   Blockly.defineBlocksWithJsonArray([
 
     // === Events ===
@@ -575,10 +593,10 @@ function defineBlocks() {
     },
     {
       type: 'movement_start_steer',
-      message0: '%1 start moving steering %2',
+      message0: '%1 start moving %2',
       args0: [
         DRIVE_ICON,
-        { type: 'input_value', name: 'STEER', check: 'Number' },
+        { type: 'field_steer', name: 'STEER', value: 0, min: -100, max: 100, precision: 1 },
       ],
       previousStatement: null, nextStatement: null, colour: C.movement,
       inputsInline: true,
@@ -1155,7 +1173,7 @@ function defineBlocks() {
   };
 
   P.movement_start_steer = b =>
-    `motor_pair.move(motor_pair.PAIR_1, ${val(b,'STEER','0')}, velocity=${VEL_ABS_EXPR})\n`;
+    `motor_pair.move(motor_pair.PAIR_1, ${b.getFieldValue('STEER') || 0}, velocity=${VEL_ABS_EXPR})\n`;
 
   P.movement_stop = b =>
     `motor_pair.stop(motor_pair.PAIR_1)\n`;
