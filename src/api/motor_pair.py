@@ -65,10 +65,18 @@ async def move_for_time(pair_id, duration, steering=0, *, velocity=360, stop=_mo
 
 async def move_for_degrees(pair_id, degrees, steering=0, *, velocity=360, stop=_motor.BRAKE, acceleration=1000, deceleration=1000):
     lp, rp = _get(pair_id)
-    start = _b.getMotorPosition(lp)
+    # On suit la moyenne (en valeur absolue) des deux moteurs : sinon, avec un
+    # steering qui ralentit ou immobilise le moteur intérieur, la boucle prend
+    # un temps disproportionné voire infini (cas steering=±50).
+    start_l = _b.getMotorPosition(lp)
+    start_r = _b.getMotorPosition(rp)
     move(pair_id, steering, velocity=velocity if degrees >= 0 else -velocity)
     target = abs(degrees)
-    while abs(_b.getMotorPosition(lp) - start) < target:
+    while True:
+        dl = abs(_b.getMotorPosition(lp) - start_l)
+        dr = abs(_b.getMotorPosition(rp) - start_r)
+        if (dl + dr) / 2 >= target:
+            break
         if _b.isStopped():
             break
         await _b.sleep(0.02)
@@ -92,9 +100,17 @@ async def move_tank_for_time(pair_id, duration, left_velocity, right_velocity, *
 
 async def move_tank_for_degrees(pair_id, degrees, left_velocity, right_velocity, *, stop=_motor.BRAKE, acceleration=1000, deceleration=1000):
     lp, rp = _get(pair_id)
-    start = _b.getMotorPosition(lp)
+    # Cf. move_for_degrees : on prend la moyenne des deux moteurs pour éviter
+    # qu'une vitesse nulle d'un côté ne bloque la sortie de boucle.
+    start_l = _b.getMotorPosition(lp)
+    start_r = _b.getMotorPosition(rp)
     move_tank(pair_id, left_velocity, right_velocity)
-    while abs(_b.getMotorPosition(lp) - start) < abs(degrees):
+    target = abs(degrees)
+    while True:
+        dl = abs(_b.getMotorPosition(lp) - start_l)
+        dr = abs(_b.getMotorPosition(rp) - start_r)
+        if (dl + dr) / 2 >= target:
+            break
         if _b.isStopped():
             break
         await _b.sleep(0.02)
