@@ -214,6 +214,18 @@ function setupRobotDrag(state) {
   const raycaster = new THREE.Raycaster();
   let dragMode = null;  // 'move' | 'rotate'
 
+  // Bouton de bascule Move/Rotate (utile sur écrans tactiles type Promethean où
+  // Shift n'est pas accessible). Reste optionnel : si absent, fallback shift only.
+  const modeToggle = document.getElementById('drag-mode-toggle');
+  let rotateMode = false;
+  if (modeToggle) {
+    modeToggle.addEventListener('click', () => {
+      rotateMode = !rotateMode;
+      modeToggle.classList.toggle('active', rotateMode);
+      modeToggle.textContent = rotateMode ? '↻ Rotate (on)' : '↻ Rotate';
+    });
+  }
+
   function ndcFromEvent(e) {
     const rect = canvas.getBoundingClientRect();
     return new THREE.Vector2(
@@ -252,8 +264,9 @@ function setupRobotDrag(state) {
     if (!isOverRobot(e)) return;
     state.dragging = true;
     // Shift+drag pour tourner ; sinon translation. Alt+drag est évité car
-    // ChromeOS l'intercepte pour ses propres menus.
-    dragMode = e.shiftKey ? 'rotate' : 'move';
+    // ChromeOS l'intercepte pour ses propres menus. Sur tactile, le bouton
+    // "Rotate" du sim-header sert d'équivalent à Shift.
+    dragMode = (e.shiftKey || rotateMode) ? 'rotate' : 'move';
     canvas.setPointerCapture(e.pointerId);
     canvas.style.cursor = 'grabbing';
     e.preventDefault();

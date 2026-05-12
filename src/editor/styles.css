@@ -173,6 +173,24 @@ select.btn option {
   width: 100%;
   height: 100%;
   display: block;
+  /* Empêche le navigateur (notamment sur écran tactile / Promethean) d'interpréter
+     le drag comme un pan/scroll et de couper le geste avec un pointercancel. */
+  touch-action: none;
+}
+
+#drag-mode-toggle {
+  background: rgba(15, 20, 25, 0.85);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-left: 8px;
+}
+#drag-mode-toggle.active {
+  color: var(--accent-2);
+  border-color: var(--accent-2);
 }
 
 /* Hub display (matrice 5x5 + bouton power) — intégré dans l'overlay des capteurs */
